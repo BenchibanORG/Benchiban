@@ -76,6 +76,9 @@ O tema do projeto é a monitoramento de preços de placas de vídeo de alto dese
 ### Representação dos Requisitos:
 
 Será criado um Diagrama de Casos de Uso (UML) para representar as interações do usuário com o sistema.
+Link da Imagem:
+
+https://github.com/MateusAkiraMuranaka/Webuy/blob/9d644a2a4551e6e7aed84cfca986cd7f0a19463e/Diagrama%20UML.jpg
 
 ## 3.2. Considerações de Design
 
@@ -87,9 +90,15 @@ Será criado um Diagrama de Casos de Uso (UML) para representar as interações 
 
 - *Nível de Contexto*: Mostra como o sistema interage com os usuários e fontes externas de dados.
 
+https://github.com/MateusAkiraMuranaka/Webuy/blob/9d644a2a4551e6e7aed84cfca986cd7f0a19463e/C4%20Modelo%20-%20Contexto.png
+
 - *Nível de Contêineres*: Divide o sistema em componentes como backend, frontend, APIs e banco de dados.
 
+https://github.com/MateusAkiraMuranaka/Webuy/blob/9d644a2a4551e6e7aed84cfca986cd7f0a19463e/C4%20Modelo%20-%20Conteiners.png
+
 - *Nível de Componentes*: Detalha os componentes principais do sistema, como o scraper, o conversor de moedas e a interface de usuário.
+
+https://github.com/MateusAkiraMuranaka/Webuy/blob/9d644a2a4551e6e7aed84cfca986cd7f0a19463e/C4%20Modelo%20-%20Componentes.png
 
 - *Nível de Código*: Expõe detalhes de implementação e estrutura do código-fonte.
 
