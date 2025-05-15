@@ -76,9 +76,8 @@ O tema do projeto é a monitoramento de preços de placas de vídeo de alto dese
 ### Representação dos Requisitos:
 
 Será criado um Diagrama de Casos de Uso (UML) para representar as interações do usuário com o sistema.
-Link da Imagem:
 
-https://github.com/MateusAkiraMuranaka/Webuy/blob/9d644a2a4551e6e7aed84cfca986cd7f0a19463e/Diagrama%20UML.jpg
+![Diagrama UML](https://github.com/user-attachments/assets/8d2da584-64a5-45c6-ad84-60ffbe69b75f)
 
 ## 3.2. Considerações de Design
 
@@ -90,15 +89,15 @@ https://github.com/MateusAkiraMuranaka/Webuy/blob/9d644a2a4551e6e7aed84cfca986cd
 
 - *Nível de Contexto*: Mostra como o sistema interage com os usuários e fontes externas de dados.
 
-https://github.com/MateusAkiraMuranaka/Webuy/blob/9d644a2a4551e6e7aed84cfca986cd7f0a19463e/C4%20Modelo%20-%20Contexto.png
+![C4 Modelo - Contexto](https://github.com/user-attachments/assets/c785259d-2a88-4b49-84b1-8c31577ff302)
 
 - *Nível de Contêineres*: Divide o sistema em componentes como backend, frontend, APIs e banco de dados.
 
-https://github.com/MateusAkiraMuranaka/Webuy/blob/9d644a2a4551e6e7aed84cfca986cd7f0a19463e/C4%20Modelo%20-%20Conteiners.png
+![C4 Modelo - Conteiners](https://github.com/user-attachments/assets/31f19408-2a34-4593-a5cc-9fae43f9da8c)
 
 - *Nível de Componentes*: Detalha os componentes principais do sistema, como o scraper, o conversor de moedas e a interface de usuário.
 
-https://github.com/MateusAkiraMuranaka/Webuy/blob/9d644a2a4551e6e7aed84cfca986cd7f0a19463e/C4%20Modelo%20-%20Componentes.png
+![C4 Modelo - Componentes](https://github.com/user-attachments/assets/ab14be2b-0b2e-4f93-995a-cbd274f06d3a)
 
 - *Nível de Código*: Expõe detalhes de implementação e estrutura do código-fonte.
 
