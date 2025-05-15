@@ -1,7 +1,9 @@
 # *Capa*
 
 *Título do Projeto*: Monitoramento de Preço Global de Placas de Vídeo de Alto Desempenho para Inteligência Artificial
+
 *Nome do Estudante*: Mateus Akira de Oliveira Muranaka
+
 *Curso*: Engenharia de Software
 
 # Resumo
