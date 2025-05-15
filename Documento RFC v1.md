@@ -75,7 +75,9 @@ O tema do projeto é a monitoramento de preços de placas de vídeo de alto dese
 
 ### Representação dos Requisitos:
 
-Será criado um Diagrama de Casos de Uso (UML) para representar as interações do usuário com o sistema.
+Diagrama de Casos de Uso (UML) para representar as interações do usuário com o sistema:
+
+![Diagrama UML](https://github.com/user-attachments/assets/ac0495b2-ea10-4946-a161-0ee3d7d64d1d)
 
 ## 3.2. Considerações de Design
 
@@ -87,9 +89,15 @@ Será criado um Diagrama de Casos de Uso (UML) para representar as interações 
 
 - *Nível de Contexto*: Mostra como o sistema interage com os usuários e fontes externas de dados.
 
+![C4 Modelo - Contexto](https://github.com/user-attachments/assets/9fe47d1c-ba87-42a8-b8c2-9bcd1be20576)
+
 - *Nível de Contêineres*: Divide o sistema em componentes como backend, frontend, APIs e banco de dados.
 
+![C4 Modelo - Conteiners](https://github.com/user-attachments/assets/ca0dc09c-8c03-4173-8290-d9183613b1f0)
+
 - *Nível de Componentes*: Detalha os componentes principais do sistema, como o scraper, o conversor de moedas e a interface de usuário.
+
+![C4 Modelo - Componentes](https://github.com/user-attachments/assets/bc4e30fe-8dd7-4e57-942e-40639e3dc414)
 
 - *Nível de Código*: Expõe detalhes de implementação e estrutura do código-fonte.
 
