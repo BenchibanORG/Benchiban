@@ -59,13 +59,15 @@ O tema do projeto é a monitoramento de preços de placas de vídeo de alto dese
 
 ### Requisitos Funcionais (RF):
 
-- RF1: O sistema deve permitir ao usuário buscar placas de vídeo por marca, modelo e especificações.
+- RF1: O sistema deve permitir que o usuário selecione modelos de placas de vídeo pré-cadastradas para monitoramento.
 
-- RF2: O sistema deve realizar scraping de preços em tempo real de sites selecionados de e-commerce.
+- RF2: O sistema deve realizar scraping de preços em tempo real a partir de sites internacionais de e-commerce previamente definidos. Sá um site representante das seguintes regiões: China, Estados Unidos da América, Brasil e Europa.
+  
+- RF3: O sistema deve converter os preços coletados para Reais (BRL) utilizando APIs de câmbio.
 
-- RF3: O sistema deve converter os preços coletados para reais utilizando APIs de câmbio.
+- RF4: O sistema deve exibir os resultados da busca de forma ordenada por menor preço, informando o nome do produto, site de origem, valor convertido e link para o produto.
 
-- RF4: O sistema deve exibir os resultados de forma organizada e fácil de entender.
+- RF5: O sistema deve permitir que o usuário envie sugestões de novos modelos de placas de vídeo para futura inclusão.
 
 ### Requisitos Não-Funcionais (RNF):
 
