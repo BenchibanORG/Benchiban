@@ -82,6 +82,7 @@ O tema do projeto é a monitoramento de preços de placas de vídeo de alto dese
 Será criado um Diagrama de Casos de Uso (UML) para representar as interações do usuário com o sistema.
 
 ![Diagrama UML](https://github.com/user-attachments/assets/8d2da584-64a5-45c6-ad84-60ffbe69b75f)
+![Diagrama UML do Projeto](Diagrama%20UML%20-%20TCC.jpg)
 
 ## 3.2. Considerações de Design
 
