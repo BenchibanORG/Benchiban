@@ -61,7 +61,7 @@ O tema do projeto é a monitoramento de preços de placas de vídeo de alto dese
 
 - RF1: O sistema deve permitir que o usuário selecione modelos de placas de vídeo pré-cadastradas para monitoramento.
 
-- RF2: O sistema deve realizar scraping de preços em tempo real a partir de sites internacionais de e-commerce previamente definidos. Sá um site representante das seguintes regiões: China, Estados Unidos da América, Brasil e Europa.
+- RF2: O sistema deve realizar scraping de preços em tempo real a partir de sites internacionais de e-commerce previamente definidos. Sá um site representante das seguintes regiões: China (AliExpress), Estados Unidos da América(newegg), Brasil (MercadoLivre) e Europa (Caseking).
   
 - RF3: O sistema deve converter os preços coletados para Reais (BRL) utilizando APIs de câmbio.
 
@@ -109,7 +109,7 @@ Será criado um Diagrama de Casos de Uso (UML) para representar as interações 
 
 *Linguagens de Programação*: Python para backend e web scraping e React JS para frontend.
 
-*Frameworks e Bibliotecas*: Flask (para backend), Requests e BeautifulSoup (para web scraping), Axios (para integração com APIs), React Router (para navegação no frontend).
+*Frameworks e Bibliotecas*: FastAPI (para backend), Requests e BeautifulSoup (para web scraping), Axios (para integração com APIs), React Router (para navegação no frontend).
 
 *Ferramentas de Desenvolvimento*: GitHub (para versionamento de código), Docker (para contêinerização), Github Actions (para CI/CD), PostgreSQL (para armazenar dados de preços).
 
@@ -138,7 +138,5 @@ Requests: https://docs.python-requests.org/en/latest/
 BeautifulSoup: https://www.crummy.com/software/BeautifulSoup/
 
 React JS: https://reactjs.org/
-
-Flask: https://flask.palletsprojects.com/
 
 APIs de câmbio: https://www.exchangerate-api.com/
