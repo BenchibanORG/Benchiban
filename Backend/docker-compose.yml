@@ -1,0 +1,79 @@
+version: '3.8'
+
+services:
+  # Serviço para o backend da sua aplicação
+  backend:
+    # Constrói a imagem do backend a partir do Dockerfile no diretório atual
+    build: .
+    # Mapeia a porta 8000 da sua máquina para a porta 8000 do contêiner
+    ports:
+      - "8000:8000"
+    # Mapeia o código da sua máquina para o contêiner.
+    # Qualquer alteração que você fizer no seu código local será refletida no contêiner.
+    volumes:
+      - .:/app
+    # Define as variáveis de ambiente necessárias para o backend se conectar ao banco de dados
+    environment:
+      - DB_HOST=db
+      - DB_USER=root
+      - DB_PASSWORD=a1k2i3r4a5
+      - DB_NAME=tcc_db
+    # Garante que o backend só inicie depois que o serviço do banco de dados estiver pronto
+    depends_on:
+      - db
+
+  # Serviço para o banco de dados MySQL
+  db:
+    # Usa a imagem oficial do MySQL
+    image: mysql:8.0
+    # Mapeia a porta 3306 da sua máquina para a porta 3306 do contêiner
+    ports:
+      - "3306:3306"
+    # Define as variáveis de ambiente para a configuração inicial do MySQL
+    environment:
+      - MYSQL_ROOT_PASSWORD=a1k2i3r4a5
+      - MYSQL_DATABASE=tcc_db
+    # Define um volume para persistir os dados do banco de dados
+    volumes:
+      - db_data:/var/lib/mysql
+
+  # Serviço para o SonarQube
+  sonarqube:
+    # Usa a imagem oficial do SonarQube
+    image: sonarqube:latest
+    # Mapeia as portas para a interface web (9000) e outras conexões
+    ports:
+      - "9000:9000"
+      - "9092:9092"
+    # Conecta o SonarQube ao seu próprio banco de dados
+    environment:
+      - SONAR_JDBC_URL=jdbc:mysql://sonardb:3306/sonar
+      - SONAR_JDBC_USERNAME=sonar
+      - SONAR_JDBC_PASSWORD=a1k2i3r4a5
+    # Garante que o SonarQube só inicie depois que o banco de dados dele estiver pronto
+    depends_on:
+      - sonardb
+    # Define um volume para persistir os dados do SonarQube
+    volumes:
+      - sonarqube_data:/opt/sonarqube/data
+      - sonarqube_extensions:/opt/sonarqube/extensions
+      - sonarqube_logs:/opt/sonarqube/logs
+
+  # Banco de dados para o SonarQube (separado para evitar conflitos)
+  sonardb:
+    image: mysql:8.0
+    environment:
+      - MYSQL_ROOT_PASSWORD=a1k2i3r4a5
+      - MYSQL_DATABASE=sonar
+      - MYSQL_USER=sonar
+      - MYSQL_PASSWORD=a1k2i3r4a5
+    volumes:
+      - sonardb_data:/var/lib/mysql
+
+# Define os volumes para persistência de dados
+volumes:
+  db_data:
+  sonarqube_data:
+  sonarqube_extensions:
+  sonarqube_logs:
+  sonardb_data:
