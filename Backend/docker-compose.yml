@@ -29,7 +29,7 @@ services:
     # Mapeia a porta 3306 da sua máquina para a porta 3306 do contêiner
     ports:
       - "3306:3306"
-    # Define as variáveis de ambiente para a configuração inicial do MySQL
+    # Define as variáveis de ambiente para a configuração initMeu proejtocial do MySQL
     environment:
       - MYSQL_ROOT_PASSWORD=a1k2i3r4a5
       - MYSQL_DATABASE=tcc_db
