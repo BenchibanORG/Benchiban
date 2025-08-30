@@ -16,7 +16,7 @@ services:
     environment:
       - DB_HOST=db
       - DB_USER=root
-      - DB_PASSWORD=a1k2i3r4a5
+      - DB_PASSWORD=
       - DB_NAME=tcc_db
     # Garante que o backend só inicie depois que o serviço do banco de dados estiver pronto
     depends_on:
@@ -31,7 +31,7 @@ services:
       - "3306:3306"
     # Define as variáveis de ambiente para a configuração initMeu proejtocial do MySQL
     environment:
-      - MYSQL_ROOT_PASSWORD=a1k2i3r4a5
+      - MYSQL_ROOT_PASSWORD=
       - MYSQL_DATABASE=tcc_db
     # Define um volume para persistir os dados do banco de dados
     volumes:
@@ -49,7 +49,7 @@ services:
     environment:
       - SONAR_JDBC_URL=jdbc:mysql://sonardb:3306/sonar
       - SONAR_JDBC_USERNAME=sonar
-      - SONAR_JDBC_PASSWORD=a1k2i3r4a5
+      - SONAR_JDBC_PASSWORD=
     # Garante que o SonarQube só inicie depois que o banco de dados dele estiver pronto
     depends_on:
       - sonardb
@@ -63,10 +63,10 @@ services:
   sonardb:
     image: mysql:8.0
     environment:
-      - MYSQL_ROOT_PASSWORD=a1k2i3r4a5
+      - MYSQL_ROOT_PASSWORD=
       - MYSQL_DATABASE=sonar
       - MYSQL_USER=sonar
-      - MYSQL_PASSWORD=a1k2i3r4a5
+      - MYSQL_PASSWORD=
     volumes:
       - sonardb_data:/var/lib/mysql
 
