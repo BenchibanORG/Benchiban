@@ -1,0 +1,45 @@
+# Arquivos de Configuração de Ambiente (SECRETO)
+# Esta é a linha mais importante para a segurança.
+# Impede que seu arquivo com senhas do banco de dados seja enviado para o GitHub.
+Backend/.env
+
+# Ambientes Virtuais do Python
+# Pastas que contêm as bibliotecas instaladas localmente. São pesadas e específicas da máquina.
+Backend/venv/
+Backend/.venv/
+venv/
+.venv/
+
+# Arquivos de Cache e Bytecode do Python
+# Gerados automaticamente pelo Python para otimização. Não são código-fonte.
+**/__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Pastas de IDEs e Editores
+# Configurações específicas do seu editor de código (VS Code, PyCharm, etc.)
+.vscode/
+.idea/
+
+# Arquivos de Sistema Operacional
+# Lixo gerado pelo macOS e Windows
+.DS_Store
+Thumbs.db
+
+# Logs
+# Arquivos de log podem conter informações sensíveis e não devem ser versionados.
+*.log
+logs/
+*.log.*
+
+# Arquivos e Pastas de Testes
+# Cache e relatórios de cobertura de testes
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Artefatos de Build e Distribuição do Python
+build/
+dist/
+*.egg-info/
