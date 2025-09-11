@@ -15,3 +15,8 @@ uvicorn[standard]
 requests
 beautifulsoup4
 scrapy
+passlib[bcrypt]
+python-jose[cryptography]
+pydantic-settings
+sqlalchemy
+psycopg2-binary
