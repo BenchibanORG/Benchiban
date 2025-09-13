@@ -1,12 +1,9 @@
-version: '3.8'
-
 services:
   backend:
     build: .
     command: uvicorn main:app --host 0.0.0.0 --port 8000 --reload
-    working_dir: /app/app
     volumes:
-      - ./app:/app/app
+      - ./app:/app
     ports:
       - "8000:8000"
     env_file:
@@ -23,5 +20,18 @@ services:
     env_file:
       - .env
 
+  # Interface gráfica do Banco de dados
+  pgadmin:
+    image: dpage/pgadmin4
+    env_file:
+      - .env
+    ports:
+      - "5050:80"
+    depends_on:
+      - db
+    volumes:
+      - pgadmin_data:/var/lib/pgadmin
+
 volumes:
   postgres_data:
+  pgadmin_data:
