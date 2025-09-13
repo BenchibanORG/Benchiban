@@ -1,10 +1,10 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
-from app.schemas.user import UserCreate, UserRead, Token
-from app.services.user_service import get_user_by_email, create_user
-from app.core.security import verify_password, create_access_token
-from app.db.session import SessionLocal
 from datetime import timedelta
+from schemas.user import UserCreate, UserRead, Token
+from services.user_services import get_user_by_email, create_user
+from core.security import verify_password, create_access_token
+from db.session import SessionLocal
 
 router = APIRouter()
 
@@ -18,13 +18,16 @@ def get_db():
 
 @router.post("/register", response_model=UserRead)
 def register_user(user: UserCreate, db: Session = Depends(get_db)):
-    db_user = user_service.get_user_by_email(db, email=user.email)
+    # Chamada da função corrigida (sem prefixo)
+    db_user = get_user_by_email(db, email=user.email)
     if db_user:
         raise HTTPException(status_code=400, detail="Email already registered")
-    return user_service.create_user(db=db, user=user)
+    # Chamada da função corrigida (sem prefixo)
+    return create_user(db=db, user=user)
 
 @router.post("/login", response_model=Token)
 def login_for_access_token(form_data: UserCreate, db: Session = Depends(get_db)):
+    # Chamada da função corrigida (sem prefixo)
     user = get_user_by_email(db, email=form_data.email)
     if not user or not verify_password(form_data.password, user.hashed_password):
         raise HTTPException(

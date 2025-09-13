@@ -1,7 +1,7 @@
 from datetime import datetime, timedelta, timezone
 from passlib.context import CryptContext
 from jose import JWTError, jwt
-from app.core.config import settings
+from core.config import settings
 
 # Para hashing de senha
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
