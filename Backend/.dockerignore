@@ -1,0 +1,18 @@
+Ignora o ambiente virtual do Python
+
+.venv/
+
+Ignora caches do Python
+
+pycache/
+*.pyc
+*.pyo
+*.pyd
+
+Ignora arquivos de configuração do VS Code
+
+.vscode/
+
+Ignora o arquivo de configuração do pytest
+
+pytest.ini

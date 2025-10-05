@@ -1,43 +1,44 @@
 import pytest
+from typing import Generator
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
-from main import app
-from api.endpoints.auth import get_db
-from db.session import SessionLocal, engine
-from db.base_class import Base
 
-Base.metadata.create_all(bind=engine)
+from app.db.session import SessionLocal, engine
+from app.db.base_class import Base
+from app.main import app  # Importa a 'app' principal, já com as rotas incluídas
+from app.api.endpoints.auth import get_db
 
-# Fixture principal para a sessão do banco de dados
 @pytest.fixture(scope="function")
-def db_session() -> Session:
+def db_session() -> Generator[Session, None, None]:
     """
-    Cria uma nova sessão de banco de dados para cada teste,
-    rodando dentro de uma transação que será desfeita ao final.
+    Cria um banco de dados e uma sessão limpos para cada função de teste.
+    Garante que as tabelas sejam criadas no início e removidas no final.
     """
+    Base.metadata.create_all(bind=engine)  # Cria as tabelas
     connection = engine.connect()
     transaction = connection.begin()
     session = SessionLocal(bind=connection)
     
-    yield session  # O teste executa aqui
+    yield session
     
+    # Desfaz a transação e fecha a conexão ao final do teste
     session.close()
-    transaction.rollback() # Desfaz todas as alterações do teste
+    transaction.rollback()
     connection.close()
-
+    Base.metadata.drop_all(bind=engine)  # Limpa o banco de dados
 
 @pytest.fixture(scope="function")
-def client(db_session: Session) -> TestClient:
+def client(db_session: Session) -> Generator[TestClient, None, None]:
     """
-    Cria um TestClient que usa a sessão de banco de dados transacional.
+    Cria um TestClient que usa a sessão de banco de dados de teste,
+    sobrescrevendo a dependência 'get_db'.
     """
-    def override_get_db():
-        """Sobrescreve a dependência get_db para usar a sessão de teste."""
+    def override_get_db() -> Generator[Session, None, None]:
         yield db_session
 
     app.dependency_overrides[get_db] = override_get_db
     
     yield TestClient(app)
     
-    # Limpa a sobrescrita após o teste
+    # Limpa a sobrescrita para não afetar outros testes
     del app.dependency_overrides[get_db]
