@@ -1,14 +1,14 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware # 1. Importe o Middleware
 
-from db.base_class import Base
-from db.session import engine
-from api.endpoints import auth
+from app.db.base_class import Base
+from app.db.session import engine
+from app.api.endpoints import auth
 
 # Cria todas as tabelas no banco de dados (na primeira inicialização)
 Base.metadata.create_all(bind=engine)
 
-app = FastAPI()
+app = FastAPI(title="Benchiban API")
 
 # Origem do FrontEnd
 origins = [
@@ -25,7 +25,7 @@ app.add_middleware(
 )
 
 # Inclui as rotas de autenticação
-app.include_router(auth.router, prefix="/auth", tags=["auth"])
+app.include_router(auth.router, prefix="/api/auth", tags=["auth"])
 
 @app.get("/")
 def root():
