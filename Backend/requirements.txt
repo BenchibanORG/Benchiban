@@ -25,3 +25,4 @@ email-validator
 pytest
 httpx
 python-multipart==0.0.9
+sendgrid==6.11.0
