@@ -50,22 +50,29 @@ def login_for_access_token(form_data: UserCreate, db: Session = Depends(get_db))
     )
     return {"access_token": access_token, "token_type": "bearer"}
 
-@router.post(
-    "/forgot-password",
-    summary="Solicitar redefinição de senha",
-    status_code=status.HTTP_200_OK
-)
+@router.post("/forgot-password", summary="Solicitar redefinição de senha")
 def request_password_reset(
-    payload: ForgotPasswordSchema = Body(...),
-    db: Session = Depends(get_db)
+    payload: ForgotPasswordSchema = Body(...), db: Session = Depends(get_db)
 ):
-    user = get_user_by_email(db, email=payload.email)
-    if user:
-        # Gerar token e enviar email
-        password_reset_token = create_password_reset_token(email=user.email)
-        send_reset_password_email(email=user.email, token=password_reset_token)
+    # --- LUZES DE INSPEÇÃO ---
+    print("\n--- DEBUG: PONTO 1: Entrou na função request_password_reset ---")
+    print(f"--- DEBUG: PONTO 2: E-mail recebido do frontend: '{payload.email}' ---")
 
-    return {"message": "Se um usuário com este email estiver registrado, um email de redefinição de senha será enviado."}
+    user = get_user_by_email(db, email=payload.email)
+    
+    print(f"--- DEBUG: PONTO 3: Resultado da busca no DB para o e-mail: {user} ---")
+    
+    if user:
+        print("--- DEBUG: PONTO 4: Usuário encontrado! Entrando no bloco 'if'. ---")
+        token = create_password_reset_token(email=user.email)
+        print("--- DEBUG: PONTO 5: Chamando a função send_reset_password_email... ---")
+        send_reset_password_email(email_to=user.email, token=token)
+    else:
+        print("--- DEBUG: PONTO 4: Usuário NÃO encontrado. Pulando o envio de e-mail. ---")
+        
+    print("--- DEBUG: PONTO 6: Fim da função. Retornando resposta de sucesso. ---\n")
+    
+    return {"message": "Se um usuário com este e-mail estiver registrado, um e-mail de redefinição de senha será enviado."}
 
 @router.post(
     "/reset-password",
