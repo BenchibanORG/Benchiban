@@ -43,3 +43,6 @@ htmlcov/
 build/
 dist/
 *.egg-info/
+
+# Arquivo para armazenar o token da API do eBay
+ebay_token.json
