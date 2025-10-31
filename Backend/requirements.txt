@@ -26,3 +26,7 @@ pytest
 httpx
 python-multipart==0.0.9
 sendgrid==6.11.0
+scrapfly-sdk
+beautifulsoup4
+loguru
+parsel

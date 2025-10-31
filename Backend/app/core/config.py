@@ -21,5 +21,8 @@ class Settings(BaseSettings):
     EBAY_CLIENT_SECRET: str
     EBAY_REFRESH_TOKEN: str
 
+    # Scrapfly (para Web Scraping)
+    SCRAPFLY_API_KEY: str
+
 # Cria a instância única das configurações para ser usada em toda a aplicação
 settings = Settings()
