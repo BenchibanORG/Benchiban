@@ -1,40 +1,45 @@
 from fastapi import APIRouter, Query, HTTPException, status
 from typing import List
-from app.services import ebay_service
+from app.services import ebay_service, aliexpress_service, amazon_service
+#from app.services import aliexpress_service
 from app.schemas.product import ComparisonResponse, ProductItem
 
 router = APIRouter()
 
 @router.get("/comparison", response_model=ComparisonResponse)
 def get_product_comparison(
-    q: str = Query(..., description="O termo de busca para o produto, ex: 'Nvidia RTX A6000'")
+    q: str = Query(..., description="O termo de busca para o produto, ex: 'NVIDIA RTX A6000 48GB'")
 ):
     
     print(f"\n--- Iniciando busca comparativa para: '{q}' ---")
     
-    
+    print(f"-> Buscando no eBay por: '{q}'...")
     ebay_results = ebay_service.search_ebay_items(query=q)
-    print(f"-> Encontrados {len(ebay_results)} resultados válidos no eBay.")
+    print(f"<- Encontrados {len(ebay_results)} resultados válidos no eBay.")
+
+    # --- CHAMADA AO SERVIÇO DO ALIEXPRESS ---
+    print(f"-> Buscando no AliExpress por: '{q}'...")
+    #aliexpress_results = aliexpress_service.search_aliexpress_items(query=q)
+    #print(f"<- Encontrados {len(aliexpress_results)} resultados válidos no AliExpress.")
     
-    # PLACEHOLDERS PARA FUTURAS INTEGRAÇÕES
-    # mercadolivre_results = mercadolivre_service.search_items(query=q)
-    # aliexpress_results = aliexpress_service.search_items(query=q)
-    # caseking_results = caseking_service.search_items(query=q)
+    # --- CHAMADA AO SERVIÇO DA AMAZON ---
+    print(f"-> Buscando na Amazon por: '{q}'...")
+    amazon_results = amazon_service.search_amazon_items(query=q)
+    print(f"<- Encontrados {len(amazon_results)} resultados válidos na Amazon.")
     
-    # --- Etapa 2: Estruturar os resultados por fonte ---
+ 
     results_by_source = {
         "ebay": ebay_results,
-        "mercado_livre": [], # Placeholder
-        "aliexpress": [],    # Placeholder
-        "caseking": []       # Placeholder
+        #"mercado_livre": [], # Placeholder
+        #"aliexpress": aliexpress_results,
+        "amazon": amazon_results,
     }
     
-    # --- Etapa 3: Encontrar a melhor oferta geral ---
-    
-    # Junta todos os resultados de todas as fontes numa única lista
+
     all_results = []
     all_results.extend(ebay_results)
-    # all_results.extend(mercadolivre_results) # Descomente quando implementar
+    #all_results.extend(aliexpress_results)
+    all_results.extend(amazon_results)
     
     overall_best_deal = None
     if all_results:
