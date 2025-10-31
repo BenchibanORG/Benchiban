@@ -26,7 +26,7 @@ AMAZON_SEARCH_CONFIG = {
         "search_term": "NVIDIA RTX A6000 48GB",
         "required_keywords": ["placa", "rtx", "a6000", "48gb"]
     },
-    "AMD Radeon PRO W7900 48GB": { # A placa que você mencionou
+    "AMD Radeon PRO W7900 48GB": {
         "search_term": "AMD Radeon PRO W7900 48GB",
         "required_keywords": ["w7900", "48gb"]
     }
