@@ -31,10 +31,9 @@ jobs:
     - name: Rodar testes com cobertura
       run: |
         cd Backend
-        coverage run -m pytest
-        coverage xml
+        pytest --cov=app --cov-report=xml:coverage.xml
 
-    - name: SonarQube Scan
+    - name: SonarCloud Scan
       uses: SonarSource/sonarqube-scan-action@v6
       with:
         projectBaseDir: Backend
