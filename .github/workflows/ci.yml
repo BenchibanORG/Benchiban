@@ -12,7 +12,9 @@ jobs:
 
     steps:
     - name: Checkout repositório
-      uses: actions/checkout@v3
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
 
     - name: Configurar Python
       uses: actions/setup-python@v4
@@ -24,8 +26,18 @@ jobs:
         cd Backend
         python -m pip install --upgrade pip
         pip install -r requirements.txt
+        pip install coverage
 
-    - name: Rodar testes
+    - name: Rodar testes com cobertura
       run: |
         cd Backend
-        pytest || echo "Nenhum teste implementado ainda"
+        coverage run -m pytest
+        coverage xml
+
+    - name: SonarQube Scan
+      uses: SonarSource/sonarqube-scan-action@v6
+      with:
+        projectBaseDir: Backend
+      env:
+        SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
