@@ -1,9 +1,9 @@
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel, EmailStr, Field
 
 # Schema para receber dados de criação de usuário
 class UserCreate(BaseModel):
     email: EmailStr
-    password: str
+    password: str = Field(..., min_length=1, description="Senha não pode ser vazia")
 
 # Schema para retornar dados do usuário (sem a senha)
 class UserRead(BaseModel):

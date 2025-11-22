@@ -14,9 +14,6 @@ BASE_CONFIG = {
 }
 
 # --- MAPA DE CONFIGURAÇÃO DE BUSCA ---
-# Aqui centralizamos a lógica de busca para cada produto.
-# A chave (ex: "NVIDIA RTX 5090 32GB") DEVE ser idêntica à string
-# enviada pelo frontend (do DashboardPage.js)
 AMAZON_SEARCH_CONFIG = {
     "NVIDIA RTX 5090 32GB": {
         "search_term": "NVIDIA RTX 5090 32GB",
@@ -123,4 +120,5 @@ def search_amazon_items(query: str) -> List[Dict[str, Any]]:
 
     except Exception as e:
         log.error(f"--- Amazon: Falha ao buscar a URL {url_busca}: {e}")
+        
         return []
