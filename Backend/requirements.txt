@@ -30,3 +30,5 @@ scrapfly-sdk
 beautifulsoup4
 loguru
 parsel
+apscheduler
+pytest-asyncio

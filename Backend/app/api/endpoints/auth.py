@@ -27,16 +27,13 @@ def get_db():
 
 @router.post("/register", response_model=UserRead)
 def register_user(user: UserCreate, db: Session = Depends(get_db)):
-    # Chamada da função corrigida (sem prefixo)
     db_user = get_user_by_email(db, email=user.email)
     if db_user:
         raise HTTPException(status_code=400, detail="Email já cadastrado")
-    # Chamada da função corrigida (sem prefixo)
     return create_user(db=db, user=user)
 
 @router.post("/login", response_model=Token)
 def login_for_access_token(form_data: UserCreate, db: Session = Depends(get_db)):
-    # Chamada da função corrigida (sem prefixo)
     user = get_user_by_email(db, email=form_data.email)
     if not user or not verify_password(form_data.password, user.hashed_password):
         raise HTTPException(
