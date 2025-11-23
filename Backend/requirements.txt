@@ -30,3 +30,4 @@ scrapfly-sdk
 beautifulsoup4
 loguru
 parsel
+apscheduler
