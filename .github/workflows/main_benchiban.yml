@@ -39,8 +39,8 @@ jobs:
         with:
           name: python-app
           path: |
-            .
-            !antenv/
+            Backend
+            !Backend/antenv/
 
       # 🚫 Opting Out of Oryx Build
       # If you prefer to disable the Oryx build process during deployment, follow these steps:
@@ -66,3 +66,4 @@ jobs:
           slot-name: 'Production'
 
           publish-profile: ${{ secrets.AZUREAPPSERVICE_PUBLISHPROFILE_E636648A7F2C421AB0313E312665934D }}
+
