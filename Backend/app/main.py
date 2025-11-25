@@ -2,10 +2,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.db.base_class import Base
-from app.db.session import engine
-from app.api.endpoints import auth
 from app.api.endpoints import auth, products
-from app.db.base_class import Base
 from app.db.session import engine
 from app.models.product import Product, PriceHistory
 from app.models.user import User
@@ -28,9 +25,12 @@ async def lifespan(app: FastAPI):
 # Passamos o lifespan na criação do app
 app = FastAPI(title="Benchiban API", lifespan=lifespan)
 
-# Origem do FrontEnd
+# Origem do FrontEnd e Backend
 origins = [
-    "http://localhost:3000",
+    "http://localhost:3000",#frontend local
+    "http://localhost:8000",# backend local
+    "https://benchiban.azurewebsites.net", #backend em nuvem
+    "https://black-mud-07542d60f.3.azurestaticapps.net" #frontend em nuvem
 ]
 
 # Middleware de CORS
