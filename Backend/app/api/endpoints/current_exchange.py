@@ -5,7 +5,6 @@ from app.schemas.exchange_rate import ExchangeRateResponse
 
 router = APIRouter()
 
-# Adicionamos response_model=ExchangeRateResponse aqui
 @router.get("/", response_model=ExchangeRateResponse, description="Retorna a cotação atual do Dólar (USD) para Real (BRL)")
 async def get_current_exchange_rate():
     """
@@ -14,7 +13,6 @@ async def get_current_exchange_rate():
     try:
         rate = CurrencyService.get_usd_to_brl()
         
-        # O Pydantic vai validar se esse dicionário bate com o Schema
         return {
             "currency_from": "USD",
             "currency_to": "BRL",

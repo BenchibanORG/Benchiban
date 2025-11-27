@@ -8,14 +8,19 @@ class CurrencyService:
     _CACHE_TTL = 3600
 
     @classmethod
-    def get_usd_to_brl(cls) -> float:
+    def get_usd_to_brl(cls, force_refresh: bool = False) -> float:
+        
+        #Força a busca na API de câmbio
         current_time = time.time()
         
-        # Retorna cache se ainda for válido
-        if cls._cached_rate and (current_time - cls._last_update < cls._CACHE_TTL):
+        # Se NÃO for forçado e o cache for válido, usa o cache
+        if not force_refresh and cls._cached_rate and (current_time - cls._last_update < cls._CACHE_TTL):
             return cls._cached_rate
 
-        # Tenta API Principal (Frankfurter)
+        # Se for forçado ou cache expirou, busca novo
+        log.info(f"Buscando nova cotação... (Force Refresh: {force_refresh})")
+
+        # 1. Tenta API Principal (Frankfurter)
         try:
             rate = cls._fetch_frankfurter()
             cls._update_cache(rate)
@@ -23,17 +28,16 @@ class CurrencyService:
         except Exception as e:
             log.warning(f"Falha na Frankfurter API: {e}. Tentando Fallback...")
 
-        # Tenta Fallback (AwesomeAPI)
+        # 2. Tenta Fallback (AwesomeAPI - BR)
         try:
             rate = cls._fetch_awesomeapi()
             cls._update_cache(rate)
             return rate
         except Exception as e:
-            log.error(f"Falha em ambas APIs de cotação: {e}")
-            # Se tudo falhar, retorna o último cache conhecido ou levanta erro
+            log.error(f"Falha Crítica nas APIs de cotação: {e}")
             if cls._cached_rate:
                 return cls._cached_rate
-            raise Exception("Não foi possível obter cotação USD/BRL no momento.")
+            raise Exception("Serviço de cotação indisponível.")
 
     @classmethod
     def _fetch_frankfurter(cls) -> float:

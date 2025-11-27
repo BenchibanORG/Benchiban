@@ -1,4 +1,3 @@
-import re
 import math
 from typing import List, Dict, Any, Optional
 from urllib.parse import quote_plus
@@ -11,19 +10,18 @@ from app.services.currency_service import CurrencyService
 SCRAPFLY = ScrapflyClient(key=settings.SCRAPFLY_API_KEY)
 BASE_CONFIG = {
     "asp": True,
-    "country": "US",
+    "country": "BR", # VOLTAMOS PARA BRASIL (Custo reduzido de créditos)
 }
 
 # --- MAPA DE CONFIGURAÇÃO DE BUSCA ---
-# Atualizado para termos mais compatíveis com o mercado americano
 AMAZON_SEARCH_CONFIG = {
     "NVIDIA RTX 5090 32GB": {
         "search_term": "NVIDIA RTX 5090 32GB",
-        "required_keywords": ["rtx", "5090","32GB"]
+        "required_keywords": ["rtx", "5090", "32GB"]
     },
     "NVIDIA RTX A6000 48GB": {
         "search_term": "NVIDIA RTX A6000 48GB",
-        "required_keywords": ["nvidia", "rtx", "a6000","48GB"]
+        "required_keywords": ["nvidia", "rtx", "a6000", "48GB"]
     },
     "AMD Radeon PRO W7900 48GB": {
         "search_term": "AMD Radeon PRO W7900 48GB",
@@ -33,36 +31,36 @@ AMAZON_SEARCH_CONFIG = {
 
 # --- FUNÇÕES HELPER ---
 
-def _parse_price_us(price_str: str) -> Optional[float]:
+def _parse_price_br(price_str: str) -> Optional[float]:
     """
-    Converte preço formato US (ex: '$ 1,234.56') para float (1234.56).
-    Diferença: Remove vírgula (milhar) e mantém ponto (decimal).
+    Converte preço formato BR (ex: 'R$ 1.234,56') para float (1234.56).
     """
     if not price_str:
         return None
     try:
-        # Remove sifrão, USD e espaços
-        clean = price_str.replace("$", "").replace("USD", "").strip()
-        # Remove vírgula (separador de milhar nos EUA)
-        clean = clean.replace(",", "")
-        return float(clean)
+        # Remove R$, espaços e pontos de milhar
+        limpo = price_str.replace("R$", "").replace(".", "").strip()
+        # Troca vírgula decimal por ponto
+        limpo = limpo.replace(",", ".")
+        return float(limpo)
     except (ValueError, TypeError):
-        log.warning(f"Amazon US: Não foi possível converter o preço: {price_str}")
+        log.warning(f"Amazon BR: Não foi possível converter o preço: {price_str}")
         return None
 
 def _parse_search_page(result: ScrapeApiResponse, palavras_chave_obrigatorias: List[str]) -> List[Dict[str, Any]]:
     """Extrai Título, Preço e Link da página de busca E FILTRA"""
     previews = []
-    # O seletor CSS geralmente é o mesmo globalmente
     product_boxes = result.selector.css("div.s-result-item[data-component-type=s-search-result]")
     
-    # Tenta obter a cotação para já retornar uma estimativa em BRL
+    # Precisamos da cotação para preencher o price_usd (para ordenação global no banco)
+    # Cálculo inverso: Se USD/BRL é 5.00, então 1 Real = 0.20 Dólares
     try:
-        usd_to_brl_rate = CurrencyService.get_usd_to_brl()
+        usd_to_brl = CurrencyService.get_usd_to_brl()
+        brl_to_usd_rate = 1 / usd_to_brl if usd_to_brl else 0
     except Exception:
-        usd_to_brl_rate = None
+        brl_to_usd_rate = 0
 
-    log.info(f"Amazon US: {len(product_boxes)} containers encontrados. Filtrando por {palavras_chave_obrigatorias}...")
+    log.info(f"Amazon BR: {len(product_boxes)} containers encontrados. Filtrando por {palavras_chave_obrigatorias}...")
 
     for box in product_boxes:
         titulo = box.css("div>a>h2::attr(aria-label)").get()
@@ -73,14 +71,14 @@ def _parse_search_page(result: ScrapeApiResponse, palavras_chave_obrigatorias: L
         if not link_relativo or "/slredirect/" in link_relativo:
             continue
         
-        # URL Base ajustada para .com
-        link_abs = f"https://www.amazon.com{link_relativo.split('?')[0]}"
+        # URL Base ajustada para .com.br
+        link_abs = f"https://www.amazon.com.br{link_relativo.split('?')[0]}"
         
         preco_str = box.css(".a-price .a-offscreen::text").get()
-        # Usa a nova função de parse americana
-        preco_usd = _parse_price_us(preco_str)
+        # Usa o parser Brasileiro
+        preco_brl = _parse_price_br(preco_str)
 
-        if titulo and preco_usd and link_abs:
+        if titulo and preco_brl and link_abs:
             titulo_lower = titulo.lower()
             
             # Verifica se TODAS as palavras-chave estão no título
@@ -91,32 +89,32 @@ def _parse_search_page(result: ScrapeApiResponse, palavras_chave_obrigatorias: L
                     break 
             
             if filtro_passou:
-                # Calcula estimativa em BRL para exibição
-                price_brl_estimated = None
-                if usd_to_brl_rate:
-                    # Multiplica e arredonda para 2 casas
-                    price_brl_estimated = math.ceil((preco_usd * usd_to_brl_rate) * 100) / 100
+                # CÁLCULO INVERSO: Temos Reais, estimamos Dólar para manter compatibilidade no banco
+                price_usd_estimated = round(preco_brl * brl_to_usd_rate, 2) if brl_to_usd_rate > 0 else None
 
                 previews.append({
                     "title": titulo.strip(),
-                    "price": preco_usd,        # Valor Original (para salvar no histórico)
-                    "currency": "USD",         # Moeda Original
-                    "price_usd": preco_usd,    # Valor Padronizado em Dólar
-                    "price_brl": price_brl_estimated, # Apenas visualização
+                    # Agora o dado nativo é BRL
+                    "price": preco_brl,        # Valor Original em Reais (para salvar no histórico)
+                    "currency": "BRL",         # Moeda Original
+                    "price_usd": price_usd_estimated, # Estimativa em Dólar (importante para ordenar com eBay)
+                    
+                    # Campos extras
+                    "price_brl": preco_brl,    # O próprio valor
                     "seller_rating": None,
-                    "seller_username": "Amazon US",
+                    "seller_username": "Amazon BR",
                     "link": link_abs,
                     "source": "Amazon"
                 })
             else:
                 log.debug(f"Amazon: Filtrado (não contém keywords): {titulo.strip()}")
             
-    log.info(f"Amazon US: Extraídos {len(previews)} produtos válidos APÓS FILTRAGEM.")
+    log.info(f"Amazon BR: Extraídos {len(previews)} produtos válidos APÓS FILTRAGEM.")
     return previews
 
 # --- FUNÇÃO PRINCIPAL DO SERVIÇO ---
 def search_amazon_items(query: str) -> List[Dict[str, Any]]:
-    log.info(f"--- Amazon US: Recebida busca por '{query}' ---")
+    log.info(f"--- Amazon BR: Recebida busca por '{query}' ---")
     
     config_para_busca = AMAZON_SEARCH_CONFIG.get(query)
     
@@ -127,20 +125,20 @@ def search_amazon_items(query: str) -> List[Dict[str, Any]]:
     search_term = config_para_busca["search_term"]
     palavras_filtro = config_para_busca["required_keywords"]
     
-    # URL da Amazon Americana
-    url_busca = f"https://www.amazon.com/s?k={quote_plus(search_term)}"
+    # URL da Amazon Brasileira
+    url_busca = f"https://www.amazon.com.br/s?k={quote_plus(search_term)}"
     
-    log.info(f"--- Amazon US: Buscando URL: {url_busca} ---")
+    log.info(f"--- Amazon BR: Buscando URL: {url_busca} ---")
 
     try:
         result = SCRAPFLY.scrape(ScrapeConfig(url_busca, **BASE_CONFIG))
         
         resultados = _parse_search_page(result, palavras_filtro)
         
-        # Ordena pelo preço em Dólar (price_usd)
-        resultados_ordenados = sorted(resultados, key=lambda x: x['price_usd'])
+        # Ordena pelo preço em Reais (já que estamos no BR)
+        resultados_ordenados = sorted(resultados, key=lambda x: x['price'])
         return resultados_ordenados[:3]
 
     except Exception as e:
-        log.error(f"--- Amazon US: Falha ao buscar a URL {url_busca}: {e}")
+        log.error(f"--- Amazon BR: Falha ao buscar a URL {url_busca}: {e}")
         return []
