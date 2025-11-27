@@ -13,9 +13,5 @@ class ProductItem(BaseModel):
     source: str
 
 class ComparisonResponse(BaseModel):
-    """
-    Define a estrutura da resposta final da API de comparação,
-    agrupando resultados por fonte e destacando a melhor oferta geral.
-    """
     results_by_source: Dict[str, List[ProductItem]]
     overall_best_deal: Optional[ProductItem] = None

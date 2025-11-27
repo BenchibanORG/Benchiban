@@ -18,9 +18,9 @@ class PriceHistory(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     product_id = Column(Integer, ForeignKey("products.id"))
-    
     price = Column(Float, nullable=False) # Preço
-    currency = Column(String, default="BRL") # Moeda
+    price_usd = Column(Float, nullable=True)
+    currency = Column(String, default="USD") # Moeda padrão
     source = Column(String) # De qual plataforma o preço é buscado
     link = Column(String) # Link do anúncio
     timestamp = Column(DateTime, default=lambda: datetime.now(timezone.utc))

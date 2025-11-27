@@ -1,33 +1,27 @@
 import requests
 import math
 from typing import List, Dict, Any
-
+from loguru import logger as log
 from app.services import ebay_token_manager
-
-def get_usd_to_brl_rate() -> float | None:
-    """Obtém a taxa de conversão mais recente de USD para BRL."""
-    try:
-        url = "https://api.frankfurter.app/latest?from=USD&to=BRL"
-        response = requests.get(url)
-        response.raise_for_status()
-        data = response.json()
-        return data["rates"]["BRL"]
-    except requests.exceptions.RequestException as e:
-        print(f"Aviso: Não foi possível obter a taxa de conversão. Erro: {e}")
-        return None
+from app.services.currency_service import CurrencyService
 
 def search_ebay_items(query: str) -> List[Dict[str, Any]]:
     """
-    Busca itens NOVOS no eBay, filtra, ordena e retorna os 3 melhores resultados formatados.
+    Busca itens NOVOS no eBay.
+    Retorna o preço original E o preço padronizado em USD.
     """
     url = "https://api.ebay.com/buy/browse/v1/item_summary/search"
     params = {
         "q": query,
         "limit": 20,
-        "filter": "buyingOptions:{FIXED_PRICE},conditionIds:{1000}"
+        "filter": "buyingOptions:{FIXED_PRICE},conditionIds:{1000}" # Apenas produtos novos e preço fixo
     }
 
-    valid_token = ebay_token_manager.get_valid_ebay_token()
+    try:
+        valid_token = ebay_token_manager.get_valid_ebay_token()
+    except Exception as e:
+        log.error(f"eBay: Erro ao obter token: {e}")
+        return []
     
     headers = {
         "Authorization": f"Bearer {valid_token}",
@@ -41,14 +35,17 @@ def search_ebay_items(query: str) -> List[Dict[str, Any]]:
         
         items = data.get("itemSummaries", [])
         
+        # Filtra itens válidos
         valid_items = [
             item for item in items
             if "price" in item and "seller" in item and item["seller"].get("feedbackPercentage")
         ]
 
         if not valid_items:
+            log.warning(f"eBay: Nenhum item válido encontrado para '{query}'")
             return []
 
+        # Ordena por: Maior Reputação Vendedor -> Menor Preço
         sorted_items = sorted(
             valid_items,
             key=lambda x: (-float(x["seller"]["feedbackPercentage"]), float(x["price"]["value"]))
@@ -56,20 +53,33 @@ def search_ebay_items(query: str) -> List[Dict[str, Any]]:
         
         top_3_raw = sorted_items[:3]
         
-        usd_to_brl_rate = get_usd_to_brl_rate()
+        # Obtém cotação para calcular estimativa em BRL
+        try:
+            usd_to_brl_rate = CurrencyService.get_usd_to_brl()
+        except Exception:
+            usd_to_brl_rate = None
+
         formatted_results = []
         for item in top_3_raw:
-            price_usd = float(item["price"]["value"])
-            price_brl = None
-            if usd_to_brl_rate and item["price"]["currency"] == "USD":
-                raw_brl = price_usd * usd_to_brl_rate
-                price_brl = math.ceil(raw_brl * 100) / 100
+            price_val = float(item["price"]["value"])
+            currency = item["price"]["currency"]
+            
+            # LÓGICA DE PREÇOS
+            # Se for USD, o price_usd é o próprio valor. Se for outra moeda, precisaria converter (assumindo USD por enquanto)
+            price_usd = price_val if currency == "USD" else None
+            # Estimativa em BRL (apenas para retorno da API, não necessariamente para salvar no banco como 'price')
+            price_brl_estimated = None
+            if price_usd and usd_to_brl_rate:
+                price_brl_estimated = math.ceil((price_usd * usd_to_brl_rate) * 100) / 100
 
             formatted_results.append({
                 "title": item.get("title"),
-                "price_usd": price_usd,
-                "price_brl": price_brl,
-                "currency": item["price"]["currency"],
+                # Campos para o Banco de Dados
+                "price": price_val,         # Valor Original (ex: 1000)
+                "currency": currency,       # Moeda Original (ex: USD)
+                "price_usd": price_usd,     # Valor em Dólar (ex: 1000)
+                # Campos extras para Display
+                "price_brl": price_brl_estimated, 
                 "seller_rating": float(item["seller"]["feedbackPercentage"]),
                 "seller_username": item["seller"]["username"],
                 "link": item["itemWebUrl"],
@@ -79,5 +89,5 @@ def search_ebay_items(query: str) -> List[Dict[str, Any]]:
         return formatted_results
 
     except requests.exceptions.RequestException as e:
-        print(f"Erro ao acessar a API do eBay: {e}")
+        log.error(f"eBay: Erro na requisição da API: {e}")
         return []
