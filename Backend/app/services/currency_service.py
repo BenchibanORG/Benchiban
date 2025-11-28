@@ -1,5 +1,6 @@
 import requests
 import time
+from datetime import datetime, timezone # <--- Import adicionado
 from loguru import logger as log
 
 class CurrencyService:
@@ -38,6 +39,14 @@ class CurrencyService:
             if cls._cached_rate:
                 return cls._cached_rate
             raise Exception("Serviço de cotação indisponível.")
+
+    @classmethod
+    def get_last_update_timestamp(cls):
+        """Retorna o datetime da última atualização do cache."""
+        if cls._last_update == 0:
+            return None
+        # Converte timestamp UNIX para objeto datetime com timezone UTC
+        return datetime.fromtimestamp(cls._last_update, tz=timezone.utc)
 
     @classmethod
     def _fetch_frankfurter(cls) -> float:
