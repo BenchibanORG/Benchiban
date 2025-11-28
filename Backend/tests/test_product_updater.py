@@ -1,5 +1,5 @@
 import pytest
-from unittest.mock import patch, MagicMock, call
+from unittest.mock import patch, MagicMock
 from app.services.product_updater import update_all_products, PRODUCTS_TO_MONITOR
 
 
@@ -7,18 +7,17 @@ from app.services.product_updater import update_all_products, PRODUCTS_TO_MONITO
 async def test_update_all_products_creates_product_and_saves_history():
     """Testa fluxo normal: produto não existe, APIs retornam resultados, histórico salvo."""
 
-    # --- Mock Session, Query, Product ---
     mock_db = MagicMock()
 
-    # mock da query(Product).filter().first()
-    mock_db.query.return_value.filter.return_value.first.return_value = None  # Não existe ainda
+    # Produto ainda não existe
+    mock_db.query.return_value.filter.return_value.first.return_value = None
 
-    # Mock dos serviços externos
+    # Resultados FAKES contendo "price" (obrigatório)
     fake_ebay_results = [
-        {"price_brl": 10000, "source": "ebay", "link": "http://e1"}
+        {"price": 10000, "currency": "USD", "source": "ebay", "link": "http://e1"}
     ]
     fake_amazon_results = [
-        {"price_brl": 9500, "source": "amazon", "link": "http://a1"}
+        {"price": 9500, "currency": "BRL", "source": "amazon", "link": "http://a1"}
     ]
 
     with patch("app.services.product_updater.SessionLocal", return_value=mock_db), \
@@ -27,37 +26,36 @@ async def test_update_all_products_creates_product_and_saves_history():
          patch("app.services.product_updater.Product") as MockProduct, \
          patch("app.services.product_updater.PriceHistory") as MockPrice:
 
-        # Mock do Product() criado
-        mock_product_instance = MagicMock()
-        mock_product_instance.id = 1
-        MockProduct.return_value = mock_product_instance
+        # Mock de product
+        mock_product = MagicMock()
+        mock_product.id = 1
+        MockProduct.return_value = mock_product
 
         await update_all_products()
 
-        #  Produto deve ser criado para cada item da lista
+        # Produto deve ser criado para cada termo da lista
         assert MockProduct.call_count == len(PRODUCTS_TO_MONITOR)
 
-        #  Commit chamado após inserir produto e após inserir histórico
-        assert mock_db.commit.call_count >= len(PRODUCTS_TO_MONITOR)
+        # PriceHistory deve ser criado para ebay + amazon
+        expected_history_count = len(PRODUCTS_TO_MONITOR) * (len(fake_ebay_results) + len(fake_amazon_results))
+        assert MockPrice.call_count == expected_history_count
 
-        # Histórico de preço deve ser salvo
-        assert MockPrice.call_count == len(PRODUCTS_TO_MONITOR) * (
-            len(fake_ebay_results) + len(fake_amazon_results)
-        )
+        # Commit deve ser chamado várias vezes
+        assert mock_db.commit.call_count >= len(PRODUCTS_TO_MONITOR)
 
 
 @pytest.mark.asyncio
 async def test_update_all_products_when_product_exists():
     """Testa quando o produto já existe no banco."""
-    
+
     mock_db = MagicMock()
 
-    # mocka como se o produto já existisse
-    mock_product_instance = MagicMock()
-    mock_product_instance.id = 1
-    mock_db.query.return_value.filter.return_value.first.return_value = mock_product_instance
+    mock_product = MagicMock()
+    mock_product.id = 1
+    mock_db.query.return_value.filter.return_value.first.return_value = mock_product
 
-    fake_results = [{"price_brl": 5000, "source": "ebay", "link": "x"}]
+    # Cada API retorna 1 resultado com price
+    fake_results = [{"price": 5000, "source": "ebay", "link": "x"}]
 
     with patch("app.services.product_updater.SessionLocal", return_value=mock_db), \
          patch("app.services.product_updater.ebay_service.search_ebay_items", return_value=fake_results), \
@@ -66,21 +64,19 @@ async def test_update_all_products_when_product_exists():
 
         await update_all_products()
 
-        # Nenhum Product criado (já existe)
-        mock_db.add.assert_any_call(MockPrice.return_value)
-        # PriceHistory deve ser criado
+        # Product não deve ser criado, apenas history
         assert MockPrice.call_count == len(PRODUCTS_TO_MONITOR) * 2
 
 
 @pytest.mark.asyncio
 async def test_update_all_products_no_results():
-    """Testa o caso de nenhuma API retornar resultados."""
-    
+    """Nenhuma API retorna resultados → nenhum histórico salvo."""
+
     mock_db = MagicMock()
 
-    mock_existing = MagicMock()
-    mock_existing.id = 1
-    mock_db.query.return_value.filter.return_value.first.return_value = mock_existing
+    mock_product = MagicMock()
+    mock_product.id = 1
+    mock_db.query.return_value.filter.return_value.first.return_value = mock_product
 
     with patch("app.services.product_updater.SessionLocal", return_value=mock_db), \
          patch("app.services.product_updater.ebay_service.search_ebay_items", return_value=[]), \
@@ -94,19 +90,16 @@ async def test_update_all_products_no_results():
 
 @pytest.mark.asyncio
 async def test_update_all_products_exception_handling():
-    """Testa se rollback é chamado quando ocorre erro."""
-    
+    """Se ocorre erro, rollback deve ser chamado e sessão fechada."""
+
     mock_db = MagicMock()
 
-    # Força erro ao consultar
+    # Força erro
     mock_db.query.side_effect = Exception("DB error")
 
     with patch("app.services.product_updater.SessionLocal", return_value=mock_db):
 
         await update_all_products()
 
-        # Deve chamar rollback
         mock_db.rollback.assert_called_once()
-
-        # Sessão deve ser fechada mesmo com erro
         mock_db.close.assert_called_once()

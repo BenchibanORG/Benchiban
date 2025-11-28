@@ -1,161 +1,169 @@
 import pytest
 from unittest.mock import MagicMock, AsyncMock, patch
 from fastapi.testclient import TestClient
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from app.main import app
 from app.models.product import Product, PriceHistory
-from app.api.endpoints.auth import get_db  # <--- Import necessário para o override
+from app.api.endpoints.auth import get_db
 
 client = TestClient(app)
 
-# ===========================
-# HELPERS PARA CONFIGURAÇÃO DE MOCKS
-# ===========================
+# ===============================
+# HELPERS PARA MOCKS DE QUERY
+# ===============================
 
-def make_product_query_mock(product):
+def make_single_timestamp_query_mock(ts):
+    """Mock da query que faz:
+       db.query(PriceHistory.timestamp).order_by(desc()).first()
+    """
     mock_query = MagicMock()
-    mock_filter = MagicMock()
-    mock_query.filter.return_value = mock_filter
-    mock_filter.first.return_value = product
-    return mock_query
-
-def make_price_history_query_mock(history_list):
-    mock_query = MagicMock()
-    mock_filter = MagicMock()
     mock_order = MagicMock()
-    mock_limit = MagicMock()
-    mock_query.filter.return_value = mock_filter
-    mock_filter.order_by.return_value = mock_order
-    mock_order.limit.return_value = mock_limit
-    mock_limit.all.return_value = history_list
+    mock_query.filter.return_value = mock_query   # compatibilidade
+    mock_query.order_by.return_value = mock_order
+    mock_order.first.return_value = (ts,)
     return mock_query
+
+def make_history_batch_query_mock(history_items):
+    """Mock da query que pega o lote do mesmo timestamp."""
+    mock_query = MagicMock()
+    mock_filter_1 = MagicMock()
+    mock_filter_2 = MagicMock()
+
+    mock_query.filter.return_value = mock_filter_1
+    mock_filter_1.filter.return_value = mock_filter_2
+    mock_filter_2.order_by.return_value = mock_filter_2
+    mock_filter_2.all.return_value = history_items
+
+    return mock_query
+
 
 # ============================================================
-# TESTE 1: Produto existe E tem histórico → NÃO deve atualizar
+# TESTE 1: Produto existe E possui histórico → NÃO deve atualizar
 # ============================================================
 @pytest.mark.asyncio
 async def test_comparison_returns_cached_results():
-    
+
     mock_db = MagicMock()
 
-    # 1. Cria os objetos simulados
-    product = Product(id=1, name="NVIDIA RTX 5090 32GB", search_term="NVIDIA RTX 5090 32GB")
-    
+    # Produto existente
+    ts_now = datetime.now(timezone.utc)
+    product = Product(id=1, name="RTX 5090", search_term="RTX 5090")
+
     history_ebay = PriceHistory(
-        id=1, product_id=1, price=10000.0, currency="BRL",
-        source="ebay", link="http://example.com/ebay",
-        timestamp=datetime.now(timezone.utc)
+        id=1, product_id=1, price=10000, currency="BRL",
+        source="ebay", link="http://e.com", timestamp=ts_now
     )
     history_amazon = PriceHistory(
-        id=2, product_id=1, price=12000.0, currency="BRL",
-        source="amazon", link="http://example.com/amazon",
-        timestamp=datetime.now(timezone.utc)
+        id=2, product_id=1, price=12000, currency="BRL",
+        source="amazon", link="http://a.com", timestamp=ts_now
     )
 
-    # 2. Popula o relacionamento manualmente
     product.history = [history_ebay, history_amazon]
 
-    # 3. Configura os mocks de query
-    mock_product_query = make_product_query_mock(product)
-    mock_history_query = make_price_history_query_mock([history_ebay, history_amazon])
+    # Query #1 — buscar produto
+    mock_product_query = MagicMock()
+    mock_product_query.filter.return_value.first.return_value = product
+
+    # Query #2 — buscar último timestamp
+    mock_timestamp_query = make_single_timestamp_query_mock(ts_now)
+
+    # Query #3 — buscar lote de histórico
+    mock_batch_query = make_history_batch_query_mock([history_ebay, history_amazon])
 
     def query_side_effect(model):
         if model is Product:
             return mock_product_query
+        if model is PriceHistory.timestamp:
+            return mock_timestamp_query
         if model is PriceHistory:
-            return mock_history_query
-        raise RuntimeError(f"Modelo inesperado na query: {model}")
+            return mock_batch_query
+        raise RuntimeError(f"Query inesperada para {model}")
 
     mock_db.query.side_effect = query_side_effect
 
-    # --- CORREÇÃO: Usar dependency_overrides em vez de patch para o DB ---
+    # Override de DB
     app.dependency_overrides[get_db] = lambda: mock_db
 
     try:
-        # Patch apenas na função de update, pois ela é chamada dentro da lógica
-        with patch("app.api.endpoints.products.update_all_products", new=AsyncMock()) as mock_update:
+        with patch("app.api.endpoints.products.update_all_products", new=AsyncMock()) as mock_update, \
+             patch("app.services.currency_service.CurrencyService.get_usd_to_brl", return_value=5.0), \
+             patch("app.services.currency_service.CurrencyService.get_last_update_timestamp", return_value=ts_now):
 
-            response = client.get("/api/products/comparison?q=NVIDIA RTX 5090 32GB")
+            response = client.get("/api/products/comparison?q=RTX 5090")
             data = response.json()
 
             assert response.status_code == 200
-
-            # Verificação principal: O update NÃO deve ter sido chamado
-            mock_update.assert_not_called()
+            mock_update.assert_not_called()  # não deve atualizar
 
             assert data["overall_best_deal"]["price_brl"] == 10000.0
             assert len(data["results_by_source"]["ebay"]) == 1
-    
+
     finally:
-        # Limpa o override para não afetar outros testes
         app.dependency_overrides = {}
 
 
 # ============================================================
-# TESTE 2: Produto não existe (ou novo) → DEVE atualizar
+# TESTE 2: Produto não existe → DEVE atualizar
 # ============================================================
 @pytest.mark.asyncio
 async def test_comparison_triggers_update_for_missing_product():
 
     mock_db = MagicMock()
-    
-    product_after_update = Product(id=1, name="RTX A6000", search_term="RTX A6000")
-    
-    # Simula: 1ª chamada retorna None, 2ª chamada retorna produto
+
+    # 1ª query retorna None → produto não existe
+    # 2ª query retorna produto pós-update
+    product_after = Product(id=2, name="RTX A6000", search_term="RTX A6000")
     mock_db.query.return_value.filter.return_value.first.side_effect = [
-        None, product_after_update
+        None,
+        product_after
     ]
 
     app.dependency_overrides[get_db] = lambda: mock_db
 
     try:
-        with patch("app.api.endpoints.products.update_all_products", new=AsyncMock()) as mock_update:
+        with patch("app.api.endpoints.products.update_all_products", new=AsyncMock()) as mock_update, \
+             patch("app.services.currency_service.CurrencyService.get_usd_to_brl", return_value=5.0), \
+             patch("app.services.currency_service.CurrencyService.get_last_update_timestamp", return_value=None):
 
             response = client.get("/api/products/comparison?q=RTX A6000")
             assert response.status_code == 200
 
-            # Verificação principal: O update DEVE ter sido chamado
             mock_update.assert_awaited()
+
     finally:
         app.dependency_overrides = {}
 
 
 # ============================================================
-# TESTE 3: Produto existe mas sem histórico → DEVE atualizar
+# TESTE 3: Produto existe MAS sem histórico → DEVE atualizar
 # ============================================================
 @pytest.mark.asyncio
-async def test_comparison_returns_empty_when_no_history():
+async def test_comparison_triggers_update_when_no_history():
 
     mock_db = MagicMock()
 
-    product = Product(id=1, name="RTX 9000", search_term="RTX 9000")
-    product.history = []  # Histórico vazio
+    product = Product(id=3, name="RTX 9000", search_term="RTX 9000")
+    product.history = []  # História vazia
 
-    mock_product_query = make_product_query_mock(product)
-    mock_history_query = make_price_history_query_mock([])
+    mock_product_query = MagicMock()
+    mock_product_query.filter.return_value.first.return_value = product
 
-    def query_side_effect(model):
-        if model is Product:
-            return mock_product_query
-        if model is PriceHistory:
-            return mock_history_query
-        raise RuntimeError("Modelo inesperado")
-
-    mock_db.query.side_effect = query_side_effect
+    mock_db.query.side_effect = lambda model: mock_product_query if model is Product else MagicMock()
 
     app.dependency_overrides[get_db] = lambda: mock_db
 
     try:
-        with patch("app.api.endpoints.products.update_all_products", new=AsyncMock()) as mock_update:
+        with patch("app.api.endpoints.products.update_all_products", new=AsyncMock()) as mock_update, \
+             patch("app.services.currency_service.CurrencyService.get_usd_to_brl", return_value=5.0), \
+             patch("app.services.currency_service.CurrencyService.get_last_update_timestamp", return_value=None):
 
             response = client.get("/api/products/comparison?q=RTX 9000")
             data = response.json()
 
             assert response.status_code == 200
-            
-            # Deve atualizar pois histórico está vazio
             mock_update.assert_awaited()
 
             assert data["results_by_source"]["ebay"] == []
+
     finally:
         app.dependency_overrides = {}
