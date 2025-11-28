@@ -11,7 +11,6 @@ from app.schemas.product import ComparisonResponse
 
 router = APIRouter()
 
-# Adicionado response_model=ComparisonResponse
 @router.get("/comparison", response_model=ComparisonResponse)
 async def get_product_comparison(
     q: str = Query(..., description="O termo de busca para o produto, ex: 'NVIDIA RTX 5090 32GB'"),
@@ -19,12 +18,21 @@ async def get_product_comparison(
 ):
     print(f"\n--- Usuário buscou: '{q}' ---")
 
-    # 1. OBTER COTAÇÃO ATUAL
+    # 1. OBTER COTAÇÃO ATUAL E TIMESTAMP (CORRIGIDO)
     try:
+        # Pega apenas a taxa (float)
         usd_rate = CurrencyService.get_usd_to_brl()
+        
+        # Pega a data separadamente usando o novo método
+        rate_dt = CurrencyService.get_last_update_timestamp()
+        
+        # Se rate_dt existir, converte para string ISO; senão, fica None
+        rate_timestamp = rate_dt.isoformat() if rate_dt else None
+        
     except Exception as e:
         print(f"Erro ao obter cotação: {e}")
         usd_rate = 0.0
+        rate_timestamp = None
 
     # 2. TENTA BUSCAR NO BANCO
     product = db.query(Product).filter(Product.search_term == q).first()
@@ -44,6 +52,7 @@ async def get_product_comparison(
 
         if last_entry:
             last_ts = last_entry[0]
+            # Janela de tempo de 2 minutos para pegar itens da mesma "batelada" de scraping
             time_window = last_ts - timedelta(minutes=2)
 
             latest_history = db.query(PriceHistory)\
@@ -55,20 +64,26 @@ async def get_product_comparison(
     # 4. FORMATA A RESPOSTA
     results_by_source = {
         "ebay": [],
-        "amazon": []
+        "amazon": [],
     }
     
     for h in latest_history:
-        price_usd = h.price_usd
+        # Se h.price_usd não existir no model ainda, usamos lógica de fallback
+        price_usd_val = getattr(h, 'price_usd', None)
+        
+        # Se o preço original for em USD e não tivermos o campo price_usd salvo
+        if h.currency == "USD" and price_usd_val is None:
+            price_usd_val = h.price
+
         calculated_brl = 0.0
     
-        # Lógica de conversão inicial
+        # Lógica de conversão
         if h.currency == "BRL":
-            # Amazon BR: O preço real é o próprio
+            # Amazon BR / ML: O preço real é o próprio
             calculated_brl = h.price
-        elif price_usd and usd_rate > 0:
+        elif price_usd_val and usd_rate > 0:
             # eBay USD: Converte usando a cotação DE AGORA
-            calculated_brl = math.ceil((price_usd * usd_rate) * 100) / 100
+            calculated_brl = math.ceil((price_usd_val * usd_rate) * 100) / 100
 
         item = {
             "title": h.original_title if h.original_title else product.name,
@@ -77,31 +92,37 @@ async def get_product_comparison(
             "rating": h.seller_rating,
             "price_original": h.price,
             "currency_original": h.currency,
-            "price_usd": price_usd,
-            "price_brl": calculated_brl, # Valor base para comparação
+            "price_usd": price_usd_val,
+            "price_brl": calculated_brl,
             "source": h.source,
             "link": getattr(h, "link", "#"), 
             "timestamp": h.timestamp
         }
 
-        source_key = h.source.lower()
+        source_key = h.source.lower().replace(" ", "")
         if "amazon" in source_key: 
             results_by_source["amazon"].append(item)
         elif "ebay" in source_key:
             results_by_source["ebay"].append(item)
+        # Adiciona suporte caso apareçam outros sources
+        elif source_key not in results_by_source:
+             results_by_source[source_key] = [item]
+        else:
+             results_by_source[source_key].append(item)
 
     # --- Ordenação baseada em REAIS (BRL) ---
     def sort_by_price(item):
- 
-        # Comparamos Amazon (fixo) vs eBay (convertido agora).
         return item['price_brl'] if item['price_brl'] else float('inf')
 
-    results_by_source["amazon"].sort(key=sort_by_price)
-    results_by_source["ebay"].sort(key=sort_by_price)
+    # Ordena todas as listas
+    for source in results_by_source:
+        results_by_source[source].sort(key=sort_by_price)
 
     # 5. MELHOR OFERTA GERAL
     overall_best_deal = None
-    all_items = results_by_source["amazon"] + results_by_source["ebay"]
+    all_items = []
+    for items in results_by_source.values():
+        all_items.extend(items)
         
     if all_items:
         best_item = min(all_items, key=sort_by_price)
@@ -110,5 +131,6 @@ async def get_product_comparison(
     return {
         "results_by_source": results_by_source,
         "overall_best_deal": overall_best_deal,
-        "current_exchange_rate": usd_rate
+        "current_exchange_rate": usd_rate,
+        "exchange_rate_timestamp": rate_timestamp 
     }
