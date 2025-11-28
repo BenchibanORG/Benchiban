@@ -1,10 +1,11 @@
-import re
 import math
+import re
 from typing import List, Dict, Any, Optional
 from urllib.parse import quote_plus
 from loguru import logger as log
 from scrapfly import ScrapeApiResponse, ScrapeConfig, ScrapflyClient
-from app.core.config import settings # Importa as configurações seguras
+from app.core.config import settings
+from app.services.currency_service import CurrencyService 
 
 # --- CONFIGURAÇÃO DO CLIENTE ---
 SCRAPFLY = ScrapflyClient(key=settings.SCRAPFLY_API_KEY)
@@ -15,31 +16,86 @@ BASE_CONFIG = {
 
 # --- MAPA DE CONFIGURAÇÃO DE BUSCA ---
 AMAZON_SEARCH_CONFIG = {
+    # ------------------------------------------------------
+    # PROFISSIONAIS / HIGH-END
+    # ------------------------------------------------------
+
     "NVIDIA RTX 5090 32GB": {
         "search_term": "NVIDIA RTX 5090 32GB",
-        "required_keywords": ["placa", "rtx", "5090", "32gb"]
+        "required_keywords": ["rtx", "5090", "32gb"]
     },
+
     "NVIDIA RTX A6000 48GB": {
         "search_term": "NVIDIA RTX A6000 48GB",
-        "required_keywords": ["nvidia", "rtx", "a6000"]
+        "required_keywords": ["rtx", "a6000"]
     },
+
     "AMD Radeon PRO W7900 48GB": {
         "search_term": "AMD Radeon PRO W7900 48GB",
-        "required_keywords": ["amd", "radeon", "w7900", "48gb", "placa"]
+        "required_keywords": ["radeon", "w7900", "48gb"]
+    },
+
+    "NVIDIA RTX 6000 Ada 48GB": {
+        "search_term": "NVIDIA RTX 6000 Ada 48GB",
+        "required_keywords": ["rtx", "6000", "ada"]
+    },
+
+    # ------------------------------------------------------
+    # INTERMEDIÁRIAS / ENTHUSIAST
+    # ------------------------------------------------------
+    
+    "AMD Radeon RX 7900 XTX 24GB": {
+        "search_term": "AMD Radeon RX 7900 XTX 24GB",
+        "required_keywords": ["radeon","rx","7900", "xtx"]
+    },
+
+    "NVIDIA RTX 4070 Ti SUPER 16GB": {
+        "search_term": "NVIDIA RTX 4070 Ti SUPER 16GB",
+        "required_keywords": ["rtx", "4070", "ti", "16gb"]
+    },
+
+    "NVIDIA RTX 4080 Super 16GB": {
+        "search_term": "NVIDIA RTX 4080 Super 16GB",
+        "required_keywords": ["rtx", "4080", "super"]
+    },
+
+    # ------------------------------------------------------
+    # INICIANTES / CUSTO BENEFÍCIO
+    # ------------------------------------------------------
+
+    "AMD Radeon RX 7600 XT 16GB": {
+        "search_term": "AMD Radeon RX 7600 XT 16GB",
+        "required_keywords": ["rx", "7600", "xt", "16gb"]
+    },
+
+    "AMD Radeon RX 7900 XT 20GB": {
+        "search_term": "AMD Radeon RX 7900 XT 20GB",
+        "required_keywords": ["rx", "7900", "xt"]
+    },
+
+    "Intel Arc A770 16GB": {
+        "search_term": "Intel Arc A770 16GB",
+        "required_keywords": ["intel", "arc", "a770"]
     }
 }
 
-# --- FUNÇÕES HELPER (do seu script Colab) ---
-def _parse_preco_para_float(preco_str: str) -> Optional[float]:
-    """Converte uma string de preço (ex: 'R$ 1.234,56') para float (1234.56)"""
-    if not preco_str:
+
+# --- FUNÇÕES HELPER ---
+
+def _parse_price_br(price_str: str) -> Optional[float]:
+    """
+    Converte preço formato BR (ex: 'R$ 1.234,56') para float (1234.56).
+    """
+    if not price_str:
         return None
     try:
-        limpo = preco_str.replace("R$", "").strip()
-        limpo = limpo.replace(".", "").replace(",", ".")
+        # Remove R$, espaços e pontos de milhar
+        limpo = price_str.replace("R$", "").replace(".", "").strip()
+        # Troca vírgula decimal por ponto
+        limpo = limpo.replace(",", ".")
         return float(limpo)
     except (ValueError, TypeError):
-        log.warning(f"Amazon: Não foi possível converter o preço: {preco_str}")
+        log.warning(f"Amazon BR: Não foi possível converter o preço: {price_str}")
         return None
 
 def _parse_search_page(result: ScrapeApiResponse, palavras_chave_obrigatorias: List[str]) -> List[Dict[str, Any]]:
@@ -47,22 +103,37 @@ def _parse_search_page(result: ScrapeApiResponse, palavras_chave_obrigatorias: L
     previews = []
     product_boxes = result.selector.css("div.s-result-item[data-component-type=s-search-result]")
     
-    log.info(f"Amazon: {len(product_boxes)} containers encontrados. Filtrando por {palavras_chave_obrigatorias}...")
+    # Precisamos da cotação para preencher o price_usd (para ordenação global no banco)
+    # Cálculo inverso: Se USD/BRL é 5.00, então 1 Real = 0.20 Dólares
+    try:
+        usd_to_brl = CurrencyService.get_usd_to_brl()
+        brl_to_usd_rate = 1 / usd_to_brl if usd_to_brl else 0
+    except Exception:
+        brl_to_usd_rate = 0
+
+    log.info(f"Amazon BR: {len(product_boxes)} containers encontrados. Filtrando por {palavras_chave_obrigatorias}...")
 
     for box in product_boxes:
+        # Primeiro tenta aria-label (pode estar vazio!)
         titulo = box.css("div>a>h2::attr(aria-label)").get()
         if not titulo:
+            # Fallback robusto: pega todos os spans dentro do h2
             titulo = "".join(box.css("h2 a span::text").getall()).strip()
+        # Limpa espaços extras
+        if titulo:
+            titulo = re.sub(r'\s+', ' ', titulo).strip()
         
         link_relativo = box.css("div>a::attr(href)").get()
         if not link_relativo or "/slredirect/" in link_relativo:
             continue
         
+        # URL Base ajustada para .com.br
         link_abs = f"https://www.amazon.com.br{link_relativo.split('?')[0]}"
+        
         preco_str = box.css(".a-price .a-offscreen::text").get()
-        preco_num = _parse_preco_para_float(preco_str)
+        preco_brl = _parse_price_br(preco_str)
 
-        if titulo and preco_num and link_abs:
+        if titulo and preco_brl and link_abs:
             titulo_lower = titulo.lower()
             
             # Verifica se TODAS as palavras-chave estão no título
@@ -73,52 +144,56 @@ def _parse_search_page(result: ScrapeApiResponse, palavras_chave_obrigatorias: L
                     break 
             
             if filtro_passou:
+                # CÁLCULO INVERSO: Temos Reais, estimamos Dólar para manter compatibilidade no banco
+                price_usd_estimated = round(preco_brl * brl_to_usd_rate, 2) if brl_to_usd_rate > 0 else None
+
                 previews.append({
                     "title": titulo.strip(),
-                    "price_usd": None, # Amazon.com.br já está em BRL
-                    "price_brl": preco_num,
-                    "currency": "BRL",
-                    "seller_rating": None, # O scraping da Amazon não pegou o rating
-                    "seller_username": "Amazon Seller", # O scraping não pegou o vendedor
+                    # Agora o dado nativo é BRL
+                    "price": preco_brl,        # Valor Original em Reais (para salvar no histórico)
+                    "currency": "BRL",         # Moeda Original
+                    "price_usd": price_usd_estimated, # Estimativa em Dólar (importante para ordenar com eBay)
+                    
+                    # Campos extras
+                    "price_brl": preco_brl,    # O próprio valor
+                    "seller_rating": None,
+                    "seller_username": "Amazon BR",
                     "link": link_abs,
                     "source": "Amazon"
                 })
             else:
-                log.debug(f"Amazon: Filtrado (não contém palavras-chave): {titulo.strip()}")
+                log.debug(f"Amazon: Filtrado (não contém keywords): {titulo.strip()}")
             
-    log.info(f"Amazon: Extraídos {len(previews)} produtos válidos APÓS FILTRAGEM.")
+    log.info(f"Amazon BR: Extraídos {len(previews)} produtos válidos APÓS FILTRAGEM.")
     return previews
 
 # --- FUNÇÃO PRINCIPAL DO SERVIÇO ---
 def search_amazon_items(query: str) -> List[Dict[str, Any]]:
-    log.info(f"--- Amazon: Recebida busca por '{query}' ---")
+    log.info(f"--- Amazon BR: Recebida busca por '{query}' ---")
     
-    # 1. Encontra a configuração correta
     config_para_busca = AMAZON_SEARCH_CONFIG.get(query)
     
     if not config_para_busca:
-        log.warning(f"--- Amazon: Nenhuma configuração de scraping encontrada para '{query}'. Pulando. ---")
+        log.warning(f"--- Amazon: Nenhuma configuração para '{query}'. ---")
         return []
 
-    # 2. Prepara a URL
     search_term = config_para_busca["search_term"]
     palavras_filtro = config_para_busca["required_keywords"]
+    
+    # URL da Amazon Brasileira
     url_busca = f"https://www.amazon.com.br/s?k={quote_plus(search_term)}"
     
-    log.info(f"--- Amazon: Buscando URL: {url_busca} ---")
+    log.info(f"--- Amazon BR: Buscando URL: {url_busca} ---")
 
     try:
-        # 3. Faz o scraping (SÍNCRONO)
         result = SCRAPFLY.scrape(ScrapeConfig(url_busca, **BASE_CONFIG))
         
-        # 4. Faz o parse e filtra
         resultados = _parse_search_page(result, palavras_filtro)
         
-        # 5. Ordena pelo preço e retorna os 3 melhores
-        resultados_ordenados = sorted(resultados, key=lambda x: x['price_brl'])
+        # Ordena pelo preço em Reais (já que estamos no BR)
+        resultados_ordenados = sorted(resultados, key=lambda x: x['price'])
         return resultados_ordenados[:3]
 
     except Exception as e:
-        log.error(f"--- Amazon: Falha ao buscar a URL {url_busca}: {e}")
-        
+        log.error(f"--- Amazon BR: Falha ao buscar a URL {url_busca}: {e}")
         return []

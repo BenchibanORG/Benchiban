@@ -2,19 +2,16 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.db.base_class import Base
-from app.api.endpoints import auth, products
 from app.db.session import engine
-from app.models.product import Product, PriceHistory
-from app.models.user import User
 from app.core.scheduler import start_scheduler
-
-# Cria todas as tabelas no banco de dados (na primeira inicialização)
-Base.metadata.create_all(bind=engine)
+from app.models.product import Product, PriceHistory  # noqa: F401
+from app.models.user import User  # noqa: F401
+from app.api.endpoints import auth, products, current_exchange
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Lógica de Início
-    print("--- Criando Tabelas no Banco de Dados ---")
+    print("--- Criando Tabelas no Banco de Dados (se não existirem) ---")
     Base.metadata.create_all(bind=engine)
     
     print("--- Inicializando Agendador de Tarefas ---")
@@ -27,10 +24,10 @@ app = FastAPI(title="Benchiban API", lifespan=lifespan)
 
 # Origem do FrontEnd e Backend
 origins = [
-    "http://localhost:3000",#frontend local
-    "http://localhost:8000",# backend local
-    "https://benchiban.azurewebsites.net", #backend em nuvem
-    "https://black-mud-07542d60f.3.azurestaticapps.net" #frontend em nuvem
+    "http://localhost:3000",
+    "http://localhost:8000",
+    "https://benchiban.azurewebsites.net", 
+    "https://black-mud-07542d60f.3.azurestaticapps.net" 
 ]
 
 # Middleware de CORS
@@ -42,11 +39,16 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Inclui as rotas de autenticação
+# --- ROTAS ---
+
+# Autenticação
 app.include_router(auth.router, prefix="/api/auth", tags=["auth"])
 
-#Rota de Produtos
+# Produtos (Scraping e Comparação)
 app.include_router(products.router, prefix="/api/products", tags=["products"])
+
+# Câmbio
+app.include_router(current_exchange.router, prefix="/api/exchange-rate", tags=["exchange-rate"])
 
 @app.get("/")
 def root():
