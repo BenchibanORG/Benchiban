@@ -1,4 +1,4 @@
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Query
 from datetime import datetime, timezone
 from app.services.currency_service import CurrencyService
 from app.schemas.exchange_rate import ExchangeRateResponse
@@ -6,7 +6,7 @@ from app.schemas.exchange_rate import ExchangeRateResponse
 router = APIRouter()
 
 @router.get("/", response_model=ExchangeRateResponse, description="Retorna a cotação atual do Dólar (USD) para Real (BRL)")
-async def get_current_exchange_rate():
+async def get_current_exchange_rate(refresh: bool = False):
     """
     Endpoint dedicado para obter a cotação atual.
     """
