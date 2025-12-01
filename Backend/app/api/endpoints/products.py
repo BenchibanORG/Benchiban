@@ -2,12 +2,15 @@ from fastapi import APIRouter, Query, Depends
 from sqlalchemy.orm import Session
 from sqlalchemy import desc
 import math
-from datetime import timedelta
+from datetime import datetime, timedelta, timezone
+from typing import Dict, Any
 from app.api.endpoints.auth import get_db
 from app.models.product import Product, PriceHistory
 from app.services.product_updater import update_all_products
 from app.services.currency_service import CurrencyService
 from app.schemas.product import ComparisonResponse 
+from app.models.product import Product, PriceHistory
+from app.schemas.product import PriceHistoryResponse, PriceHistoryPoint
 
 router = APIRouter()
 
@@ -134,3 +137,80 @@ async def get_product_comparison(
         "current_exchange_rate": usd_rate,
         "exchange_rate_timestamp": rate_timestamp 
     }
+
+@router.get("/history", response_model=PriceHistoryResponse)
+def get_product_history(
+    product_name: str = Query(..., description="Nome exato ou termo de busca do produto"),
+    period_days: int = Query(30, description="Quantos dias de histórico buscar"),
+    db: Session = Depends(get_db)
+):
+    # 1. Busca o Produto (Pai)
+    product = db.query(Product).filter(Product.name.ilike(f"%{product_name}%")).first()
+    if not product:
+        product = db.query(Product).filter(Product.search_term.ilike(f"%{product_name}%")).first()
+    
+    if not product:
+        return PriceHistoryResponse(product_name=product_name, history=[])
+
+    # 2. Define Data Limite (Timezone Aware)
+    limit_date = datetime.now(timezone.utc) - timedelta(days=period_days)
+
+    # 3. Busca Todos os Dados Brutos (Ordenados)
+    raw_data = (
+        db.query(PriceHistory)
+        .filter(PriceHistory.product_id == product.id)
+        .filter(PriceHistory.timestamp >= limit_date)
+        .order_by(PriceHistory.timestamp.asc()) 
+        .all()
+    )
+
+    # 4. Agrupamento Inteligente (A Mágica acontece aqui)
+    # Objetivo: Reduzir 10 anúncios do mesmo minuto em 1 ponto com o MENOR preço.
+    grouped_points: Dict[str, Dict[str, Any]] = {}
+
+    for entry in raw_data:
+        # Arredonda para o Minuto (remove segundos/microssegundos para agrupar a bateria de scraping)
+        # Ex: "2025-11-28 16:04"
+        time_key = entry.timestamp.strftime("%Y-%m-%d %H:%M")
+        
+        # Chave única para o grupo: Data + Loja
+        group_key = f"{time_key}_{entry.source}"
+
+        # Valores atuais dessa linha
+        val_usd = entry.price_usd
+        val_brl = entry.price if entry.currency == 'BRL' else None # Só confia no BRL se a flag for BRL
+
+        if group_key not in grouped_points:
+            # Cria novo ponto no grupo
+            grouped_points[group_key] = {
+                "date": entry.timestamp.isoformat(), # Mantém formato ISO completo para o front
+                "source": entry.source if entry.source else "Desconhecido",
+                "price_usd": val_usd,
+                "price_brl": val_brl
+            }
+        else:
+            # Se já existe, atualiza com o MENOR preço encontrado naquele minuto
+            current = grouped_points[group_key]
+            
+            # Lógica de Mínimo para USD
+            if val_usd is not None:
+                if current["price_usd"] is None or val_usd < current["price_usd"]:
+                    current["price_usd"] = val_usd
+            
+            # Lógica de Mínimo para BRL
+            if val_brl is not None:
+                if current["price_brl"] is None or val_brl < current["price_brl"]:
+                    current["price_brl"] = val_brl
+
+    # 5. Converte o dicionário agrupado de volta para lista
+    final_history = [
+        PriceHistoryPoint(**data) for data in grouped_points.values()
+    ]
+
+    # Reordena para garantir cronologia
+    final_history.sort(key=lambda x: x.date)
+
+    return PriceHistoryResponse(
+        product_name=product.name,
+        history=final_history
+    )
