@@ -23,4 +23,16 @@ class ComparisonResponse(BaseModel):
     results_by_source: Dict[str, List[ProductItem]]
     overall_best_deal: Optional[ProductItem] = None
     current_exchange_rate: Optional[float] = None
-    exchange_rate_timestamp: Optional[str] = None 
+    exchange_rate_timestamp: Optional[str] = None
+
+class PriceHistoryPoint(BaseModel):
+    """Um ponto no gráfico contendo valores em BRL e USD."""
+    date: str
+    price_brl: Optional[float] = None  # Valor em Reais
+    price_usd: Optional[float] = None  # Valor em Dólar
+    source: str
+
+class PriceHistoryResponse(BaseModel):
+    """Resposta contendo a lista de pontos."""
+    product_name: str
+    history: List[PriceHistoryPoint]

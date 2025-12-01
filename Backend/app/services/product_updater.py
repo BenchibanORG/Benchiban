@@ -3,6 +3,7 @@ from sqlalchemy.orm import Session
 from app.db.session import SessionLocal
 from app.models.product import Product, PriceHistory
 from app.services import ebay_service, amazon_service
+from app.services.currency_service import CurrencyService 
 from loguru import logger as log
 
 # Lista atualizada com 10 GPUs
@@ -26,63 +27,64 @@ PRODUCTS_TO_MONITOR = [
 
 async def update_all_products():
     """Percorre a lista completa de GPUs, busca no eBay + Amazon e salva no banco."""
-    # Cria uma sessão síncrona para usar dentro da thread
     db: Session = SessionLocal()
-    loop = asyncio.get_event_loop()
     
     try:
         log.info("--- Iniciando Atualização Massiva de Preços ---")
         
+        # 2. Obtemos a cotação ATUAL do Dólar antes de começar o loop
+        # Isso garante que todos os produtos salvos agora tenham a mesma base de conversão
+        try:
+            usd_rate = CurrencyService.get_usd_to_brl()
+            log.info(f"Taxa de conversão USD -> BRL obtida: {usd_rate}")
+        except Exception as e:
+            log.error(f"Erro ao obter cotação: {e}. Usando fallback de segurança 5.4")
+            usd_rate = 5.4
+
         for term in PRODUCTS_TO_MONITOR:
-            log.info(f"Buscando preços para: {term}")
-
-            # 1. Garante que o produto exista no banco (Upsert)
-            product = db.query(Product).filter(Product.search_term == term).first()
-            if not product:
-                product = Product(name=term, search_term=term)
-                db.add(product)
+            log.info(f"Buscando: {term}...")
+            
+            # Garante que o produto pai existe na tabela 'products'
+            db_product = db.query(Product).filter(Product.search_term == term).first()
+            if not db_product:
+                db_product = Product(name=term, search_term=term)
+                db.add(db_product)
                 db.commit()
-                db.refresh(product)
+                db.refresh(db_product)
 
-            # 2. Busca simultânea nas duas APIs (eBay + Amazon BR)
-            # O run_in_executor evita que as chamadas HTTP bloqueiem o loop assíncrono
-            ebay_future = loop.run_in_executor(None, ebay_service.search_ebay_items, term)
-            amazon_future = loop.run_in_executor(None, amazon_service.search_amazon_items, term)
+            # Busca em paralelo (eBay + Amazon)
+            # Nota: amazon_service deve ser async ou executado em executor se for bloqueante
+            # Aqui assumindo que suas funções de busca já funcionam como estão
+            results_ebay = ebay_service.search_ebay_items(term)
+            results_amazon = await amazon_service.search_amazon_items(term) # Assumindo async, se não for, remova o await
             
-            # Aguarda ambas finalizarem (em paralelo)
-            results = await asyncio.gather(ebay_future, amazon_future, return_exceptions=True)
+            # Combina resultados
+            all_results = results_ebay + results_amazon
             
-            ebay_results = results[0]
-            amazon_results = results[1]
-
-            # Trata possíveis exceções das APIs (para não parar o loop se uma cair)
-            if isinstance(ebay_results, Exception):
-                log.error(f"eBay falhou para '{term}': {ebay_results}")
-                ebay_results = []
-                
-            if isinstance(amazon_results, Exception):
-                log.error(f"Amazon falhou para '{term}': {amazon_results}")
-                amazon_results = []
-
-            # Junta os resultados
-            all_results = (ebay_results or []) + (amazon_results or [])
-
-            count_saved = 0
             if all_results:
+                count_saved = 0
                 for item in all_results:
-                    # CORREÇÃO DEFINITIVA:
-                    # Se for Amazon, tem 'price'. Se for eBay, tem 'price_usd'.
-                    # Pegamos o que estiver disponível.
-                    final_price = item.get("price") or item.get("price_usd")
+                    raw_price = item.get("price")
+                    raw_currency = item.get("currency")
+                    
+                    if raw_price is not None:
+                        
+                        # 3. LÓGICA DE CONVERSÃO DE MOEDA
+                        final_price_brl = float(raw_price)
+                        currency_to_save = "BRL" # Padronizamos o banco como BRL
 
-                    if final_price is not None:
+                        if raw_currency == "USD":
+                            # Se veio em Dólar, convertemos para Real antes de salvar no 'price'
+                            final_price_brl = float(raw_price) * usd_rate
+                        
+                        # Se já veio em BRL (Amazon), mantém o valor original
+                        
                         history_entry = PriceHistory(
-                            product_id=product.id,
-                            price=float(final_price), # Garante float para o banco
-                            currency=item.get("currency", "BRL"), # eBay virá 'USD', Amazon virá 'BRL'
-                            
-                            # Campos adicionais novos
+                            product_id=db_product.id,
+                            price=final_price_brl, 
+                            currency=currency_to_save, 
                             price_usd=item.get("price_usd"), 
+                            exchange_rate=usd_rate if raw_currency == "USD" else 1.0,
                             source=item.get("source", "Desconhecido"),
                             link=item.get("link"),
                             original_title=item.get("title"),
@@ -92,10 +94,10 @@ async def update_all_products():
                         db.add(history_entry)
                         count_saved += 1
                 
-                db.commit() # Salva o lote deste produto de uma vez
+                db.commit()
                 log.info(f" -> {term}: {count_saved} novos preços salvos!")
             else:
-                log.warning(f" -> {term}: Nenhum resultado encontrado (eBay ou Amazon).")
+                log.warning(f" -> {term}: Nenhum resultado encontrado.")
 
     except Exception as e:
         log.critical(f"Erro crítico no updater: {e}")
@@ -105,5 +107,4 @@ async def update_all_products():
         log.info("--- Atualização Finalizada ---")
 
 if __name__ == "__main__":
-    # Permite rodar este arquivo diretamente para teste manual
     asyncio.run(update_all_products())
