@@ -27,6 +27,7 @@ class PriceHistory(Base):
     original_title = Column(String)  # O título real do anúncio
     seller_name = Column(String)     # Nome do vendedor
     seller_rating = Column(Float, nullable=True) # Avaliação
+    exchange_rate = Column(Float, nullable=True) # Taxa de câmbio
     
     # Relacionamento reverso
     product = relationship("Product", back_populates="history")
