@@ -30,6 +30,7 @@ class PriceHistoryPoint(BaseModel):
     date: str
     price_brl: Optional[float] = None  # Valor em Reais
     price_usd: Optional[float] = None  # Valor em Dólar
+    exchange_rate: Optional[float] = None
     source: str
 
 class PriceHistoryResponse(BaseModel):
