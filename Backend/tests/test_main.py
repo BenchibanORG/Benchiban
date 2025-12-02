@@ -1,4 +1,8 @@
 from fastapi.testclient import TestClient
+from unittest.mock import patch, MagicMock, AsyncMock
+from app.main import app
+
+client = TestClient(app)
 
 # Teste para o endpoint raiz ("/")
 def test_read_root(client: TestClient):
@@ -36,3 +40,43 @@ def test_cors_headers(client: TestClient):
         assert response.status_code == 200
         assert response.headers["access-control-allow-origin"] == origin
         print(f"CORS validado com sucesso para: {origin}")
+
+def test_force_update_manual_success(mock_update_all_products: MagicMock):
+    """
+    Testa se a rota /api/admin/force-update:
+    - Responde 200
+    - Chama a função em background
+    - Retorna mensagem correta
+    """
+    # Simula que a função foi chamada em background
+    mock_update_all_products.return_value = None
+
+    response = client.post("/api/admin/force-update")
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data["message"] == "Atualização forçada iniciada! O processo está rodando em segundo plano."
+    assert "details" in data
+
+    # Garante que a função foi chamada exatamente 1 vez em background
+    mock_update_all_products.assert_called_once()
+
+# === TESTE: Rota de force-update responde corretamente ===
+# --- CORREÇÃO: O patch deve apontar para "app.main.update_all_products" ---
+@patch("app.main.update_all_products", new_callable=AsyncMock)
+def test_force_update_manual_success(mock_update_all_products):
+    """
+    Testa se a rota /api/admin/force-update:
+    - Responde 200
+    - Chama a função em background
+    - Retorna mensagem correta
+    """
+    
+    response = client.post("/api/admin/force-update")
+    
+    assert response.status_code == 200
+    data = response.json()
+    assert data["message"] == "Atualização forçada iniciada! O processo está rodando em segundo plano."
+    
+    # O TestClient do FastAPI roda background tasks sincrornamente após a resposta
+    mock_update_all_products.assert_called_once()

@@ -172,7 +172,7 @@ def get_product_history(
         group_key = f"{time_key}_{entry.source}"
 
         val_usd = entry.price_usd
-        val_brl = entry.price if entry.currency == 'BRL' else None
+        val_brl = entry.price
         
         # Recupera a taxa salva naquele registro
         val_rate = getattr(entry, "exchange_rate", None)
