@@ -144,7 +144,7 @@ def get_product_history(
     period_days: int = Query(30, description="Quantos dias de histórico buscar"),
     db: Session = Depends(get_db)
 ):
-    # 1. Busca o Produto (Pai)
+    # 1. Busca o Produto
     product = db.query(Product).filter(Product.name.ilike(f"%{product_name}%")).first()
     if not product:
         product = db.query(Product).filter(Product.search_term.ilike(f"%{product_name}%")).first()
@@ -152,10 +152,10 @@ def get_product_history(
     if not product:
         return PriceHistoryResponse(product_name=product_name, history=[])
 
-    # 2. Define Data Limite (Timezone Aware)
+    # 2. Define Data Limite
     limit_date = datetime.now(timezone.utc) - timedelta(days=period_days)
 
-    # 3. Busca Todos os Dados Brutos (Ordenados)
+    # 3. Busca Todos os Dados Brutos
     raw_data = (
         db.query(PriceHistory)
         .filter(PriceHistory.product_id == product.id)
@@ -164,50 +164,43 @@ def get_product_history(
         .all()
     )
 
-    # 4. Agrupamento Inteligente (A Mágica acontece aqui)
-    # Objetivo: Reduzir 10 anúncios do mesmo minuto em 1 ponto com o MENOR preço.
+    # 4. Agrupamento Inteligente
     grouped_points: Dict[str, Dict[str, Any]] = {}
 
     for entry in raw_data:
-        # Arredonda para o Minuto (remove segundos/microssegundos para agrupar a bateria de scraping)
-        # Ex: "2025-11-28 16:04"
         time_key = entry.timestamp.strftime("%Y-%m-%d %H:%M")
-        
-        # Chave única para o grupo: Data + Loja
         group_key = f"{time_key}_{entry.source}"
 
-        # Valores atuais dessa linha
         val_usd = entry.price_usd
-        val_brl = entry.price if entry.currency == 'BRL' else None # Só confia no BRL se a flag for BRL
+        val_brl = entry.price
+        
+        # Recupera a taxa salva naquele registro
+        val_rate = getattr(entry, "exchange_rate", None)
 
         if group_key not in grouped_points:
-            # Cria novo ponto no grupo
             grouped_points[group_key] = {
-                "date": entry.timestamp.isoformat(), # Mantém formato ISO completo para o front
+                "date": entry.timestamp.isoformat(),
                 "source": entry.source if entry.source else "Desconhecido",
                 "price_usd": val_usd,
-                "price_brl": val_brl
+                "price_brl": val_brl,
+                "exchange_rate": val_rate 
             }
         else:
-            # Se já existe, atualiza com o MENOR preço encontrado naquele minuto
             current = grouped_points[group_key]
             
-            # Lógica de Mínimo para USD
+            # Mantemos a lógica de pegar o MENOR preço do lote
             if val_usd is not None:
                 if current["price_usd"] is None or val_usd < current["price_usd"]:
                     current["price_usd"] = val_usd
             
-            # Lógica de Mínimo para BRL
             if val_brl is not None:
                 if current["price_brl"] is None or val_brl < current["price_brl"]:
                     current["price_brl"] = val_brl
 
-    # 5. Converte o dicionário agrupado de volta para lista
     final_history = [
         PriceHistoryPoint(**data) for data in grouped_points.values()
     ]
 
-    # Reordena para garantir cronologia
     final_history.sort(key=lambda x: x.date)
 
     return PriceHistoryResponse(
