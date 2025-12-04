@@ -62,7 +62,6 @@ def test_force_update_manual_success(mock_update_all_products: MagicMock):
     mock_update_all_products.assert_called_once()
 
 # === TESTE: Rota de force-update responde corretamente ===
-# --- CORREÇÃO: O patch deve apontar para "app.main.update_all_products" ---
 @patch("app.main.update_all_products", new_callable=AsyncMock)
 def test_force_update_manual_success(mock_update_all_products):
     """

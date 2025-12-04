@@ -43,7 +43,6 @@ async def update_all_products():
         for term in PRODUCTS_TO_MONITOR:
             log.info(f"Buscando: {term}...")
             
-            # Inicializa contador para este produto (CORREÇÃO 1)
             count_saved = 0
 
             # Garante que o produto pai existe na tabela 'products'
@@ -55,14 +54,13 @@ async def update_all_products():
                 db.refresh(db_product)
 
             # Busca (eBay + Amazon)
-            # CORREÇÃO 2: Removido 'await' pois o amazon_service.py fornecido é síncrono
             results_ebay = ebay_service.search_ebay_items(term)
             results_amazon = amazon_service.search_amazon_items(term) 
             
             # Combina resultados
             all_results = results_ebay + results_amazon
             
-            # CORREÇÃO 3: Verificação explícita se há resultados
+            # Verificação explícita se há resultados
             if not all_results:
                 log.warning(f" -> {term}: Nenhum resultado encontrado.")
                 continue
@@ -80,7 +78,6 @@ async def update_all_products():
                     price_usd_to_save = None
                     exchange_rate_to_save = 1.0
 
-                    # --- SUA LÓGICA DE NEGÓCIO (ESTÁ CORRETA) ---
                     if raw_currency == "USD":
                         # Veio do eBay → Salva USD original, calcula BRL
                         price_usd_to_save = original_price                    

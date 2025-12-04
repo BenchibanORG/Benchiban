@@ -78,7 +78,6 @@ def search_ebay_items(query: str) -> List[Dict[str, Any]]:
                 "price": price_val,         # Valor Original (ex: 1000)
                 "currency": currency,       # Moeda Original (ex: USD)
                 "price_usd": price_usd,     # Valor em Dólar (ex: 1000)
-                # Campos extras para Display
                 "price_brl": price_brl_estimated, 
                 "seller_rating": float(item["seller"]["feedbackPercentage"]),
                 "seller_username": item["seller"]["username"],

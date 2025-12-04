@@ -102,9 +102,7 @@ def _parse_search_page(result: ScrapeApiResponse, palavras_chave_obrigatorias: L
     """Extrai Título, Preço e Link da página de busca E FILTRA"""
     previews = []
     product_boxes = result.selector.css("div.s-result-item[data-component-type=s-search-result]")
-    
-    # Precisamos da cotação para preencher o price_usd (para ordenação global no banco)
-    # Cálculo inverso: Se USD/BRL é 5.00, então 1 Real = 0.20 Dólares
+
     try:
         usd_to_brl = CurrencyService.get_usd_to_brl()
         brl_to_usd_rate = 1 / usd_to_brl if usd_to_brl else 0
@@ -127,7 +125,6 @@ def _parse_search_page(result: ScrapeApiResponse, palavras_chave_obrigatorias: L
         if not link_relativo or "/slredirect/" in link_relativo:
             continue
         
-        # URL Base ajustada para .com.br
         link_abs = f"https://www.amazon.com.br{link_relativo.split('?')[0]}"
         
         preco_str = box.css(".a-price .a-offscreen::text").get()
@@ -144,18 +141,17 @@ def _parse_search_page(result: ScrapeApiResponse, palavras_chave_obrigatorias: L
                     break 
             
             if filtro_passou:
-                # CÁLCULO INVERSO: Temos Reais, estimamos Dólar para manter compatibilidade no banco
                 price_usd_estimated = round(preco_brl * brl_to_usd_rate, 2) if brl_to_usd_rate > 0 else None
 
                 previews.append({
                     "title": titulo.strip(),
                     # Agora o dado nativo é BRL
-                    "price": preco_brl,        # Valor Original em Reais (para salvar no histórico)
+                    "price": preco_brl,        # Valor Original em Reais
                     "currency": "BRL",         # Moeda Original
-                    "price_usd": price_usd_estimated, # Estimativa em Dólar (importante para ordenar com eBay)
+                    "price_usd": price_usd_estimated, # Estimativa em Dólar
                     
                     # Campos extras
-                    "price_brl": preco_brl,    # O próprio valor
+                    "price_brl": preco_brl,
                     "seller_rating": None,
                     "seller_username": "Amazon BR",
                     "link": link_abs,

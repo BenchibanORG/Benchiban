@@ -21,7 +21,7 @@ async def get_product_comparison(
 ):
     print(f"\n--- Usuário buscou: '{q}' ---")
 
-    # 1. OBTER COTAÇÃO ATUAL E TIMESTAMP (CORRIGIDO)
+    # 1. OBTER COTAÇÃO ATUAL E TIMESTAMP
     try:
         # Pega apenas a taxa (float)
         usd_rate = CurrencyService.get_usd_to_brl()
